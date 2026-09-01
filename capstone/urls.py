@@ -19,6 +19,7 @@ from django.urls import path, include
 from django.shortcuts import redirect
 from django.conf import settings
 from django.conf.urls.static import static
+from accounts.views import register_user
 
 def root_redirect(request):
     """Redirect root URL to repositories list."""
@@ -30,6 +31,7 @@ urlpatterns = [
     path('repositories/', include('repositories.urls')),
     path('analysis/', include('analysis.urls')),
     path('accounts/', include('django.contrib.auth.urls')),
+    path('accounts/register/', register_user, name='register'),
 ]
 
 # Serve media files in development
