@@ -143,3 +143,39 @@ def repository_detail(request, repository_id):
         'repository': repository,
         'snapshots': snapshots
     })
+
+
+@login_required
+@require_http_methods(["POST"])
+def reanalyze_repository(request, repository_id):
+    """Create a fresh snapshot for an existing repository."""
+    repository = get_object_or_404(
+        Repository,
+        id=repository_id,
+        owner=request.user
+    )
+    
+    snapshot = Snapshot.objects.create(
+        repository=repository,
+        status='pending'
+    )
+    
+    return JsonResponse({
+        'snapshot_id': snapshot.id,
+        'status': 'pending'
+    })
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_repository(request, repository_id):
+    """Delete a repository and all its snapshots."""
+    repository = get_object_or_404(
+        Repository,
+        id=repository_id,
+        owner=request.user
+    )
+    
+    repository.delete()
+    
+    return JsonResponse({'status': 'deleted'})

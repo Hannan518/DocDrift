@@ -7,5 +7,7 @@ urlpatterns = [
     path('', views.list_repositories, name='list'),
     path('submit/', views.submit_repository, name='submit'),
     path('<int:repository_id>/', views.repository_detail, name='detail'),
+    path('<int:repository_id>/reanalyze/', views.reanalyze_repository, name='reanalyze'),
+    path('<int:repository_id>/delete/', views.delete_repository, name='delete'),
     path('<int:snapshot_id>/prepare/', views.prepare_analysis, name='prepare'),
 ]

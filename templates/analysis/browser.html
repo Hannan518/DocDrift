@@ -18,13 +18,13 @@
                         {% regroup snapshot.entities.all by file_path as file_list %}
                         {% for file in file_list %}
                         <div class="tree-node font-medium text-gray-900 py-1" onclick="toggleNode(this)">
-                            📄 {{ file.grouper|cut:"/" }}
+                            {{ file.grouper|cut:"/" }}
                         </div>
                         <div class="tree-children">
                             {% for entity in file.list %}
                             {% if entity.entity_type == 'class' %}
                             <div class="tree-node text-blue-700 py-1" onclick="toggleNode(this)">
-                                🏷️ {{ entity.name }}
+                                {{ entity.name }}
                             </div>
                             <div class="tree-children">
                                 {% for child in entity.children.all %}
@@ -95,6 +95,10 @@
            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
             View Drift Dashboard
         </a>
+        <button onclick="reanalyzeRepo({{ snapshot.repository.id }})"
+                class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
+            Re-analyze
+        </button>
         <a href="{% url 'repositories:list' %}" 
            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
             Back to Repositories
@@ -103,6 +107,17 @@
 </div>
 
 <script>
+function getCSRFToken() {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        cookie = cookie.trim();
+        if (cookie.startsWith('csrftoken=')) {
+            return cookie.substring('csrftoken='.length);
+        }
+    }
+    return '';
+}
+
 function toggleNode(node) {
     const children = node.nextElementSibling;
     if (children && children.classList.contains('tree-children')) {
@@ -121,6 +136,22 @@ function showEntity(id, qualifiedName, signature, filePath, lineNum, existingDoc
     document.getElementById('entity-signature').textContent = signature;
     document.getElementById('entity-existing-doc').textContent = existingDoc || 'None';
     document.getElementById('entity-generated-doc').textContent = generatedDoc || 'None';
+}
+
+async function reanalyzeRepo(repoId) {
+    const response = await fetch(`/repositories/${repoId}/reanalyze/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'Content-Type': 'application/json'
+        }
+    });
+    const data = await response.json();
+    if (response.ok) {
+        window.location.href = `/analysis/${data.snapshot_id}/status/`;
+    } else {
+        alert(data.error || 'Failed to start re-analysis');
+    }
 }
 
 // Expand first level by default
