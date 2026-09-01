@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block title %}Drift Dashboard{% endblock %}
+
+{% block content %}
+<div class="px-4 sm:px-0">
+    <h1 class="text-3xl font-bold text-gray-900 mb-8">Drift Dashboard</h1>
+
+    <div class="bg-white shadow sm:rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="mb-4">
+                <p class="text-sm text-gray-600">
+                    Repository: <span class="font-medium">{{ snapshot.repository.name }}</span>
+                </p>
+                <p class="text-sm text-gray-600">
+                    Snapshot: {{ snapshot.timestamp|date:"Y-m-d H:i" }}
+                </p>
+            </div>
+
+            <div class="border-t border-gray-200 pt-4">
+                {% with drift_flags=snapshot.drift_flags_as_current.all %}
+                {% if drift_flags %}
+                    <div class="space-y-6">
+                        <!-- Stale Documentation -->
+                        {% with stale=drift_flags|dictsort:"flag_type" %}
+                        {% for flag in stale %}
+                        {% if flag.flag_type == 'stale_doc' %}
+                        <div class="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
+                            <div class="flex items-start">
+                                <div class="flex-1">
+                                    <h3 class="text-sm font-medium text-yellow-900">
+                                        Stale Documentation: {{ flag.qualified_name }}
+                                    </h3>
+                                    <p class="text-xs text-yellow-700 mt-1">
+                                        Code changed but documentation was not updated
+                                    </p>
+                                    <div class="mt-2 text-xs text-yellow-800">
+                                        <p>Old hash: {{ flag.detail.old_hash|slice:":8" }}...</p>
+                                        <p>New hash: {{ flag.detail.new_hash|slice:":8" }}...</p>
+                                    </div>
+                                </div>
+                                <span class="ml-4 px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                    stale
+                                </span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        {% endwith %}
+
+                        <!-- New Undocumented -->
+                        {% for flag in drift_flags %}
+                        {% if flag.flag_type == 'new_undocumented' %}
+                        <div class="border border-blue-200 bg-blue-50 rounded-lg p-4">
+                            <div class="flex items-start">
+                                <div class="flex-1">
+                                    <h3 class="text-sm font-medium text-blue-900">
+                                        New Code: {{ flag.qualified_name }}
+                                    </h3>
+                                    <p class="text-xs text-blue-700 mt-1">
+                                        {{ flag.detail.file_path }}:{{ flag.detail.line_number }}
+                                    </p>
+                                </div>
+                                <span class="ml-4 px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    new
+                                </span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+
+                        <!-- Signature Changed -->
+                        {% for flag in drift_flags %}
+                        {% if flag.flag_type == 'signature_changed' %}
+                        <div class="border border-purple-200 bg-purple-50 rounded-lg p-4">
+                            <div class="flex items-start">
+                                <div class="flex-1">
+                                    <h3 class="text-sm font-medium text-purple-900">
+                                        Signature Changed: {{ flag.qualified_name }}
+                                    </h3>
+                                    <div class="mt-2 text-xs text-purple-800">
+                                        <p class="font-medium">Old:</p>
+                                        <code class="block bg-purple-100 p-1 rounded mb-1">{{ flag.detail.old_signature }}</code>
+                                        <p class="font-medium">New:</p>
+                                        <code class="block bg-purple-100 p-1 rounded">{{ flag.detail.new_signature }}</code>
+                                    </div>
+                                </div>
+                                <span class="ml-4 px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                                    changed
+                                </span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+
+                        <!-- Orphaned Documentation -->
+                        {% for flag in drift_flags %}
+                        {% if flag.flag_type == 'orphaned_doc' %}
+                        <div class="border border-red-200 bg-red-50 rounded-lg p-4">
+                            <div class="flex items-start">
+                                <div class="flex-1">
+                                    <h3 class="text-sm font-medium text-red-900">
+                                        Removed: {{ flag.qualified_name }}
+                                    </h3>
+                                    <p class="text-xs text-red-700 mt-1">
+                                        Code was removed but documentation exists in previous snapshot
+                                    </p>
+                                    <p class="text-xs text-red-800 mt-1">
+                                        {{ flag.detail.file_path }}
+                                    </p>
+                                </div>
+                                <span class="ml-4 px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                    orphaned
+                                </span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-8">
+                        <p class="text-sm text-gray-500">No drift detected. All documentation is up to date!</p>
+                    </div>
+                {% endif %}
+                {% endwith %}
+            </div>
+
+            <div class="mt-6 flex space-x-4">
+                <a href="{% url 'analysis:browser' snapshot.id %}" 
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    View Documentation
+                </a>
+                <a href="{% url 'repositories:list' %}" 
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    Back to Repositories
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
