@@ -1,0 +1,72 @@
+/* Custom CSS for DocGen */
+
+/* Tree view styles */
+.tree-node {
+    cursor: pointer;
+    user-select: none;
+}
+
+.tree-node:hover {
+    background-color: #f3f4f6;
+}
+
+.tree-node::before {
+    content: '▸';
+    display: inline-block;
+    width: 1rem;
+    margin-right: 0.25rem;
+    transition: transform 0.2s;
+}
+
+.tree-node.expanded::before {
+    transform: rotate(90deg);
+}
+
+.tree-children {
+    display: none;
+    padding-left: 1.5rem;
+}
+
+.tree-children.visible {
+    display: block;
+}
+
+/* Entity type colors */
+.entity-module { border-left: 4px solid #3b82f6; }
+.entity-class { border-left: 4px solid #8b5cf6; }
+.entity-function { border-left: 4px solid #10b981; }
+
+/* Progress bar animation */
+.progress-bar {
+    transition: width 0.3s ease-in-out;
+}
+
+/* Diff view */
+.diff-container {
+    font-family: monospace;
+    font-size: 0.875rem;
+}
+
+.diff-added {
+    background-color: #d1fae5;
+}
+
+.diff-removed {
+    background-color: #fee2e2;
+}
+
+/* Card hover effect */
+.card-hover:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 640px) {
+    .tree-node {
+        padding: 0.5rem 0;
+    }
+    
+    .tree-children {
+        padding-left: 1rem;
+    }
+}

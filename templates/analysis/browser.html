@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Documentation Browser{% endblock %}
 
@@ -6,71 +7,128 @@
 <div class="px-4 sm:px-0">
     <h1 class="text-3xl font-bold text-gray-900 mb-8">Documentation Browser</h1>
 
-    <div class="bg-white shadow sm:rounded-lg">
-        <div class="px-4 py-5 sm:p-6">
-            <div class="mb-4">
-                <p class="text-sm text-gray-600">
-                    Repository: <span class="font-medium">{{ snapshot.repository.name }}</span>
-                </p>
-                <p class="text-sm text-gray-600">
-                    Analyzed: {{ snapshot.timestamp|date:"Y-m-d H:i" }}
-                </p>
-                <p class="text-sm text-gray-600">
-                    Total Entities: {{ snapshot.total_entities }}
-                </p>
-            </div>
-
-            <div class="border-t border-gray-200 pt-4">
-                <h2 class="text-lg font-medium text-gray-900 mb-4">Code Entities</h2>
-                
-                {% if snapshot.entities.exists %}
-                <div class="space-y-4">
-                    {% for entity in snapshot.entities.all|slice:":50" %}
-                    <div class="border border-gray-200 rounded-lg p-4">
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <h3 class="text-sm font-medium text-gray-900">
-                                    {{ entity.qualified_name }}
-                                </h3>
-                                <p class="text-xs text-gray-500 mt-1">
-                                    {{ entity.file_path }}:{{ entity.line_number }}
-                                </p>
-                                <code class="text-xs text-gray-600 mt-2 block bg-gray-50 p-2 rounded">
-                                    {{ entity.signature }}
-                                </code>
-                                {% if entity.generated_docstring %}
-                                <div class="mt-3 text-sm text-gray-700">
-                                    <p class="font-medium text-gray-900 mb-1">Documentation:</p>
-                                    <p class="whitespace-pre-wrap">{{ entity.generated_docstring }}</p>
-                                </div>
-                                {% endif %}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left: Tree View -->
+        <div class="lg:col-span-1">
+            <div class="bg-white shadow sm:rounded-lg sticky top-6">
+                <div class="px-4 py-5 sm:p-6">
+                    <h2 class="text-lg font-medium text-gray-900 mb-4">Module Tree</h2>
+                    
+                    <div id="tree-container" class="text-sm">
+                        {% regroup snapshot.entities.all by file_path as file_list %}
+                        {% for file in file_list %}
+                        <div class="tree-node font-medium text-gray-900 py-1" onclick="toggleNode(this)">
+                            📄 {{ file.grouper|cut:"/" }}
+                        </div>
+                        <div class="tree-children">
+                            {% for entity in file.list %}
+                            {% if entity.entity_type == 'class' %}
+                            <div class="tree-node text-blue-700 py-1" onclick="toggleNode(this)">
+                                🏷️ {{ entity.name }}
                             </div>
-                            <span class="ml-4 px-2 py-1 text-xs font-semibold rounded-full 
-                                {% if entity.entity_type == 'class' %}bg-blue-100 text-blue-800
-                                {% elif entity.entity_type == 'function' %}bg-green-100 text-green-800
-                                {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                {{ entity.entity_type }}
-                            </span>
+                            <div class="tree-children">
+                                {% for child in entity.children.all %}
+                                <div class="entity-function pl-2 py-1 cursor-pointer hover:bg-gray-50" 
+                                     onclick="showEntity({{ entity.id }}, '{{ child.qualified_name|escapejs }}', '{{ child.signature|escapejs }}', '{{ child.file_path|escapejs }}', {{ child.line_number }}, '{{ child.existing_docstring|escapejs }}', '{{ child.generated_docstring|escapejs }}')">
+                                    <span class="text-green-600">fn</span> {{ child.name }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% elif entity.entity_type == 'function' and not entity.parent %}
+                            <div class="entity-function pl-2 py-1 cursor-pointer hover:bg-gray-50"
+                                 onclick="showEntity({{ entity.id }}, '{{ entity.qualified_name|escapejs }}', '{{ entity.signature|escapejs }}', '{{ entity.file_path|escapejs }}', {{ entity.line_number }}, '{{ entity.existing_docstring|escapejs }}', '{{ entity.generated_docstring|escapejs }}')">
+                                <span class="text-green-600">fn</span> {{ entity.name }}
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Entity Details -->
+        <div class="lg:col-span-2">
+            <div class="bg-white shadow sm:rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <div id="entity-detail" class="hidden">
+                        <h2 id="entity-name" class="text-xl font-bold text-gray-900 mb-2"></h2>
+                        
+                        <div class="mb-4">
+                            <p class="text-sm text-gray-600">
+                                <span class="font-medium">Location:</span> 
+                                <span id="entity-location"></span>
+                            </p>
+                            <p class="text-sm text-gray-600">
+                                <span class="font-medium">Line:</span> 
+                                <span id="entity-line"></span>
+                            </p>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h3 class="text-sm font-medium text-gray-900 mb-2">Signature</h3>
+                            <code id="entity-signature" class="block bg-gray-50 p-3 rounded text-sm text-gray-800"></code>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h3 class="text-sm font-medium text-gray-900 mb-2">Existing Docstring</h3>
+                            <p id="entity-existing-doc" class="bg-gray-50 p-3 rounded text-sm text-gray-700 whitespace-pre-wrap">None</p>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h3 class="text-sm font-medium text-gray-900 mb-2">Generated Documentation</h3>
+                            <p id="entity-generated-doc" class="bg-blue-50 p-3 rounded text-sm text-gray-700 whitespace-pre-wrap">None</p>
                         </div>
                     </div>
-                    {% endfor %}
+                    
+                    <div id="entity-placeholder" class="text-center py-12 text-gray-500">
+                        <p class="text-lg">Select an entity from the tree to view details</p>
+                    </div>
                 </div>
-                {% else %}
-                <p class="text-sm text-gray-500">No entities found.</p>
-                {% endif %}
-            </div>
-
-            <div class="mt-6 flex space-x-4">
-                <a href="{% url 'analysis:drift' snapshot.id %}" 
-                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                    View Drift Dashboard
-                </a>
-                <a href="{% url 'repositories:list' %}" 
-                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                    Back to Repositories
-                </a>
             </div>
         </div>
     </div>
+
+    <div class="mt-6 flex space-x-4">
+        <a href="{% url 'analysis:drift' snapshot.id %}" 
+           class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+            View Drift Dashboard
+        </a>
+        <a href="{% url 'repositories:list' %}" 
+           class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+            Back to Repositories
+        </a>
+    </div>
 </div>
+
+<script>
+function toggleNode(node) {
+    const children = node.nextElementSibling;
+    if (children && children.classList.contains('tree-children')) {
+        children.classList.toggle('visible');
+        node.classList.toggle('expanded');
+    }
+}
+
+function showEntity(id, qualifiedName, signature, filePath, lineNum, existingDoc, generatedDoc) {
+    document.getElementById('entity-placeholder').classList.add('hidden');
+    document.getElementById('entity-detail').classList.remove('hidden');
+    
+    document.getElementById('entity-name').textContent = qualifiedName;
+    document.getElementById('entity-location').textContent = filePath;
+    document.getElementById('entity-line').textContent = lineNum;
+    document.getElementById('entity-signature').textContent = signature;
+    document.getElementById('entity-existing-doc').textContent = existingDoc || 'None';
+    document.getElementById('entity-generated-doc').textContent = generatedDoc || 'None';
+}
+
+// Expand first level by default
+document.addEventListener('DOMContentLoaded', () => {
+    const firstLevel = document.querySelectorAll('.tree-node');
+    if (firstLevel.length > 0) {
+        toggleNode(firstLevel[0]);
+    }
+});
+</script>
 {% endblock %}
