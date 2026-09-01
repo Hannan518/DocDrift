@@ -5,9 +5,17 @@ The default implementation uses Google's Gemini API.
 """
 
 
+class LLMConfigError(Exception):
+    """Raised when the LLM provider is misconfigured (e.g. invalid API key).
+
+    Unlike transient errors, this aborts the whole batch instead of being
+    swallowed per-entity.
+    """
+
+
 class BaseLLMProvider:
     """Abstract base class for LLM providers."""
-    
+
     def generate_docstring(
         self,
         entity_type: str,
@@ -17,16 +25,16 @@ class BaseLLMProvider:
     ) -> str:
         """
         Generate a docstring for a code entity.
-        
+
         Args:
             entity_type: 'module', 'class', or 'function'
             name: Entity name
             signature: Full signature string
             body: Source code body
-        
+
         Returns:
             Generated docstring text
-        
+
         Raises:
             NotImplementedError: If not implemented by subclass
         """

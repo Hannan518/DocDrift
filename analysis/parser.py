@@ -1,4 +1,5 @@
 import ast
+import copy
 import hashlib
 from pathlib import Path
 from dataclasses import dataclass
@@ -8,8 +9,8 @@ from typing import List, Optional
 @dataclass
 class ParsedEntity:
     """Represents a parsed Python code entity."""
-    
-    entity_type: str  # 'module', 'class', 'function'
+
+    entity_type: str  # 'class', 'function'
     name: str
     qualified_name: str
     signature: str
@@ -21,9 +22,15 @@ class ParsedEntity:
     source_body: str  # For LLM prompt
 
 
+def _is_string_expr(node) -> bool:
+    """True for bare string expressions (docstrings / no-op string statements)."""
+    return isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) \
+        and isinstance(node.value.value, str)
+
+
 class PythonASTParser:
     """AST-based Python code parser."""
-    
+
     def parse_directory(self, root_path: Path) -> List[ParsedEntity]:
         """Parse all Python files in a directory tree."""
         entities = []
@@ -33,14 +40,14 @@ class PythonASTParser:
             except SyntaxError:
                 continue
         return entities
-    
+
     def parse_file(self, file_path: Path, root_path: Path = None) -> List[ParsedEntity]:
         """Parse a single Python file."""
         with open(file_path, 'r', encoding='utf-8') as f:
             source = f.read()
-        
+
         tree = ast.parse(source)
-        
+
         # Use relative path to avoid duplicate qualified names (e.g., multiple __init__.py)
         if root_path and root_path in file_path.parents:
             rel = file_path.relative_to(root_path)
@@ -51,27 +58,27 @@ class PythonASTParser:
                 module_name = module_name[:-9]
         else:
             module_name = file_path.stem
-        
+
         entities = []
-        
+
         for node in ast.iter_child_nodes(tree):
-            if isinstance(node, ast.FunctionDef):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 entities.append(self._parse_function(node, module_name, file_path, None))
             elif isinstance(node, ast.ClassDef):
-                entities.extend(self._parse_class(node, module_name, file_path))
-        
+                entities.extend(self._parse_class(node, module_name, file_path, None))
+
         return entities
-    
+
     def _parse_function(
         self,
-        node: ast.FunctionDef,
+        node,
         parent_name: str,
         file_path: Path,
         parent_qualified: Optional[str]
     ) -> ParsedEntity:
         """Parse a function or method definition."""
         qualified_name = f"{parent_name}.{node.name}"
-        
+
         return ParsedEntity(
             entity_type='function',
             name=node.name,
@@ -84,17 +91,18 @@ class PythonASTParser:
             existing_docstring=ast.get_docstring(node),
             source_body=ast.unparse(node),
         )
-    
+
     def _parse_class(
         self,
         node: ast.ClassDef,
         parent_name: str,
-        file_path: Path
+        file_path: Path,
+        parent_qualified: Optional[str]
     ) -> List[ParsedEntity]:
-        """Parse a class definition and its methods."""
+        """Parse a class definition and its public methods."""
         qualified_name = f"{parent_name}.{node.name}"
         entities = []
-        
+
         # Add the class itself
         entities.append(ParsedEntity(
             entity_type='class',
@@ -104,14 +112,14 @@ class PythonASTParser:
             source_hash=self._compute_hash(node),
             file_path=str(file_path),
             line_number=node.lineno,
-            parent_qualified_name=parent_name,
+            parent_qualified_name=parent_qualified,
             existing_docstring=ast.get_docstring(node),
             source_body=ast.unparse(node),
         ))
-        
-        # Add public methods (skip private methods starting with _)
+
+        # Add public methods (skip private/dunder methods starting with _)
         for item in node.body:
-            if isinstance(item, ast.FunctionDef):
+            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 if not item.name.startswith('_'):
                     entities.append(self._parse_function(
                         item,
@@ -119,70 +127,104 @@ class PythonASTParser:
                         file_path,
                         qualified_name
                     ))
-        
+
         return entities
-    
-    def _extract_signature(self, node: ast.FunctionDef) -> str:
-        """Extract function signature string."""
-        args = node.args
-        
-        # Build signature parts
+
+    def _extract_signature(self, node) -> str:
+        """Extract a syntactically correct signature string for a function/method."""
+        a = node.args
+
+        posonly = list(a.posonlyargs)
+        regular = list(a.args)
+
+        # Drop the leading self/cls (methods)
+        if posonly and posonly[0].arg in ('self', 'cls'):
+            posonly = posonly[1:]
+        elif not posonly and regular and regular[0].arg in ('self', 'cls'):
+            regular = regular[1:]
+
+        pos = posonly + regular
+        n = len(pos)
+        d = len(a.defaults)
+
+        def format_arg(arg, default=None):
+            text = arg.arg
+            if arg.annotation:
+                text += f": {ast.unparse(arg.annotation)}"
+            if default is not None:
+                text += f"={default}"
+            return text
+
         parts = []
-        
-        # Filter out self/cls
-        all_args = args.args
-        filtered_args = [a for a in all_args if a.arg not in ('self', 'cls')]
-        has_self = len(all_args) != len(filtered_args)
-        
-        # Positional args with defaults
-        num_filtered = len(filtered_args)
-        num_defaults = len(args.defaults)
-        defaults_offset = num_filtered - num_defaults
-        
-        for i, arg in enumerate(filtered_args):
-            annotation = ast.unparse(arg.annotation) if arg.annotation else ''
-            arg_str = f"{arg.arg}: {annotation}" if annotation else arg.arg
-            
-            # Apply default if applicable
-            default_idx = i - defaults_offset
-            if default_idx >= 0:
-                default_val = ast.unparse(args.defaults[default_idx])
-                arg_str = f"{arg_str}={default_val}"
-            
-            parts.append(arg_str)
-        
-        # Keyword-only args
-        for arg in args.kwonlyargs:
-            annotation = ast.unparse(arg.annotation) if arg.annotation else ''
-            if annotation:
-                parts.append(f"{arg.arg}: {annotation}")
-            else:
-                parts.append(arg.arg)
-        
-        # Return annotation
-        return_annotation = ''
-        if node.returns:
-            return_annotation = f" -> {ast.unparse(node.returns)}"
-        
-        # Varargs and kwargs
-        if args.vararg:
-            parts.append(f"*{args.vararg.arg}")
-        if args.kwarg:
-            parts.append(f"**{args.kwarg.arg}")
-        
-        return f"def {node.name}({', '.join(parts)}){return_annotation}"
-    
+        for i, arg in enumerate(pos):
+            default = ast.unparse(a.defaults[d - n + i]) if i >= n - d else None
+            parts.append(format_arg(arg, default))
+
+        if posonly:
+            parts.insert(len(posonly), '/')
+
+        if a.vararg:
+            vararg = f"*{a.vararg.arg}"
+            if a.vararg.annotation:
+                vararg += f": {ast.unparse(a.vararg.annotation)}"
+            parts.append(vararg)
+        elif a.kwonlyargs:
+            parts.append('*')
+
+        for arg, kw_default in zip(a.kwonlyargs, a.kw_defaults):
+            parts.append(format_arg(arg, ast.unparse(kw_default) if kw_default is not None else None))
+
+        if a.kwarg:
+            kwarg = f"**{a.kwarg.arg}"
+            if a.kwarg.annotation:
+                kwarg += f": {ast.unparse(a.kwarg.annotation)}"
+            parts.append(kwarg)
+
+        prefix = 'async def' if isinstance(node, ast.AsyncFunctionDef) else 'def'
+        return_annotation = f" -> {ast.unparse(node.returns)}" if node.returns else ''
+
+        return f"{prefix} {node.name}({', '.join(parts)}){return_annotation}"
+
     def _extract_class_signature(self, node: ast.ClassDef) -> str:
         """Extract class signature with base classes."""
         bases = [ast.unparse(base) for base in node.bases]
-        if bases:
-            return f"class {node.name}({', '.join(bases)})"
+        keywords = [f"{kw.arg}={ast.unparse(kw.value)}" if kw.arg else f"**{ast.unparse(kw.value)}"
+                    for kw in node.keywords]
+        all_bases = bases + keywords
+        if all_bases:
+            return f"class {node.name}({', '.join(all_bases)})"
         return f"class {node.name}"
-    
+
+    def _unparse_without_own_docstring(self, node) -> str:
+        """Unparse a node with its own (first-statement) docstring removed."""
+        if not (node.body and isinstance(node.body[0], ast.Expr)
+                and isinstance(node.body[0].value, ast.Constant)
+                and isinstance(node.body[0].value.value, str)):
+            return ast.unparse(node)
+        stripped = copy.deepcopy(node)
+        stripped.body = stripped.body[1:] or [ast.Pass()]
+        return ast.unparse(stripped)
+
     def _compute_hash(self, node) -> str:
-        """Compute SHA256 hash of normalized node body."""
-        source = ast.unparse(node)
-        # Normalize: remove docstring, collapse whitespace
-        lines = source.split('\n')
-        normalized = '\n'.join(line.strip() for line in lines if line.strip())
+        """
+        Compute SHA256 hash of the entity's code, excluding documentation.
+
+        Docstrings are stripped so that docs-only commits never change the
+        hash (and never create false drift). For classes, method bodies are
+        excluded as well - methods are separate entities with their own
+        hashes - so only class-level code (attributes, bases) affects it.
+        """
+        if isinstance(node, ast.ClassDef):
+            segments = [ast.unparse(base) for base in node.bases]
+            segments += [f"{kw.arg}={ast.unparse(kw.value)}" for kw in node.keywords if kw.arg]
+            for item in node.body:
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                if _is_string_expr(item):
+                    continue  # the class docstring
+                segments.append(ast.unparse(item))
+        else:
+            segments = [self._unparse_without_own_docstring(node)]
+
+        normalized = '\n'.join(s.strip() for s in segments if s.strip())
         return hashlib.sha256(normalized.encode()).hexdigest()

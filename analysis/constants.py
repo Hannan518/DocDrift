@@ -1,6 +1,6 @@
 # Batch sizes for micro-batch processing
 PARSING_BATCH_SIZE = 10  # Files per batch (predictable, no external API)
-DOC_GEN_BATCH_SIZE = 20  # Entities per batch (processed in parallel via ThreadPoolExecutor)
+DOC_GEN_BATCH_SIZE = 10  # Entities per batch (parallel LLM calls, must fit request timeouts)
 
 # Safety limits (will be tuned after benchmarking httpx)
 MAX_FILES_TO_PARSE = 100

@@ -51,3 +51,6 @@ Thumbs.db
 # Project specific
 /media/uploads/
 /temp/
+
+# ZCode session state
+.zcode/

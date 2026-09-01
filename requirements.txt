@@ -1,7 +1,12 @@
-Django==5.1.1
+Django>=5.2,<6
 google-genai==2.21.0
+google-api-core>=2.0.0
 GitPython==3.1.43
 python-dotenv==1.0.1
 gunicorn==22.0.0
 psycopg2-binary==2.9.9
 dj-database-url==2.1.0
+
+# Dev / test
+pytest>=8.0
+pytest-django>=4.8

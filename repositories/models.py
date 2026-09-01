@@ -20,6 +20,9 @@ class Repository(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+        # One repository per name per owner - resubmitting starts a new
+        # snapshot on the existing repository instead of duplicating it.
+        unique_together = [['owner', 'name']]
         indexes = [
             models.Index(fields=['owner', '-created_at']),
         ]

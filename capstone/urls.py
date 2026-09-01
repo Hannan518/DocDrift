@@ -16,17 +16,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.shortcuts import redirect
 from django.conf import settings
 from django.conf.urls.static import static
-from accounts.views import register_user
-
-def root_redirect(request):
-    """Redirect root URL to repositories list."""
-    return redirect('repositories:list')
+from accounts.views import register_user, landing
 
 urlpatterns = [
-    path('', root_redirect, name='root'),
+    path('', landing, name='landing'),
     path('admin/', admin.site.urls),
     path('repositories/', include('repositories.urls')),
     path('analysis/', include('analysis.urls')),
