@@ -12,11 +12,11 @@ class GeminiDocGenerator(BaseLLMProvider):
     """
     Gemini API client for docstring generation.
     
-    Supports gemini-3.6-flash with automatic fallback to gemini-3.5-flash.
+    Supports gemini-2.0-flash with automatic fallback to gemini-1.5-flash.
     Handles rate limits with exponential backoff.
     """
     
-    MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash']
+    MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash']
     
     def __init__(self, api_key: str):
         """

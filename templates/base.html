@@ -41,7 +41,10 @@
                 <div class="flex items-center">
                     {% if user.is_authenticated %}
                         <span class="text-sm text-gray-700 mr-4">{{ user.username }}</span>
-                        <a href="{% url 'logout' %}" class="text-sm text-gray-500 hover:text-gray-700">Logout</a>
+                        <form method="post" action="{% url 'logout' %}" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="text-sm text-gray-500 hover:text-gray-700 cursor-pointer bg-transparent border-none">Logout</button>
+                        </form>
                     {% else %}
                         <a href="{% url 'login' %}" class="text-sm text-gray-500 hover:text-gray-700">Login</a>
                     {% endif %}
