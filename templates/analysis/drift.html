@@ -5,6 +5,9 @@
 
 {% block content %}
 <div class="px-4 sm:px-0">
+    <div class="mb-6">
+        <a href="{% url 'repositories:list' %}" class="text-sm text-blue-600 hover:text-blue-500">&larr; Back to Repositories</a>
+    </div>
     <h1 class="text-3xl font-bold text-gray-900 mb-8">Drift Dashboard</h1>
 
     <div class="bg-white shadow sm:rounded-lg">
@@ -18,135 +21,151 @@
                 </p>
             </div>
 
+            <!-- Summary cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-yellow-700">{{ stale_count }}</div>
+                    <div class="text-xs text-yellow-600">Stale Docs</div>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-blue-700">{{ new_count }}</div>
+                    <div class="text-xs text-blue-600">New Undocumented</div>
+                </div>
+                <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-purple-700">{{ signature_count }}</div>
+                    <div class="text-xs text-purple-600">Signature Changes</div>
+                </div>
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-red-700">{{ orphaned_count }}</div>
+                    <div class="text-xs text-red-600">Orphaned Docs</div>
+                </div>
+            </div>
+
             <div class="border-t border-gray-200 pt-4">
                 <!-- Stale Documentation -->
+                {% if stale_flags %}
                 <div class="mb-8">
                     <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
                         <span class="w-3 h-3 rounded-full bg-yellow-400 mr-2"></span>
                         Stale Documentation
-                        <span class="ml-2 text-sm font-normal text-gray-500">
-                            ({{ stale_count }} flagged)
-                        </span>
+                        <span class="ml-2 text-sm font-normal text-gray-500">({{ stale_count }} flagged)</span>
                     </h3>
                     
-                    <div id="stale-flags" class="space-y-4">
-                        {% for flag in snapshot.drift_flags_as_current.all %}
-                        {% if flag.flag_type == 'stale_doc' %}
+                    <div class="space-y-4">
+                        {% for flag in stale_flags %}
                         <div class="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
                             <div class="flex items-start justify-between">
                                 <div class="flex-1">
-                                    <h4 class="text-sm font-medium text-yellow-900">
-                                        {{ flag.qualified_name }}
-                                    </h4>
-                                    <p class="text-xs text-yellow-700 mt-1">
-                                        Code changed but documentation was not updated
-                                    </p>
+                                    <h4 class="text-sm font-medium text-yellow-900">{{ flag.qualified_name }}</h4>
+                                    <p class="text-xs text-yellow-700 mt-1">{{ flag.detail.file_path }}:{{ flag.detail.line_number }}</p>
+                                    <p class="text-xs text-yellow-700">Code changed but documentation was not updated</p>
                                 </div>
-                                <button onclick="showDiff({{ flag.id }}, '{{ flag.detail.old_hash|escapejs }}', '{{ flag.detail.new_hash|escapejs }}')"
+                                <button onclick="toggleDiff('stale-{{ flag.id }}')"
                                         class="ml-4 text-xs text-yellow-800 hover:text-yellow-900 underline">
                                     View Diff
                                 </button>
                             </div>
-                            <div id="diff-{{ flag.id }}" class="hidden mt-4">
+                            <div id="stale-{{ flag.id }}" class="hidden mt-4">
                                 <div class="diff-container bg-white border rounded p-2"></div>
                             </div>
                         </div>
-                        {% endif %}
                         {% endfor %}
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- New Undocumented -->
+                {% if new_flags %}
                 <div class="mb-8">
                     <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
                         <span class="w-3 h-3 rounded-full bg-blue-400 mr-2"></span>
                         New Undocumented Code
-                        <span class="ml-2 text-sm font-normal text-gray-500">
-                            ({{ new_count }} new)
-                        </span>
+                        <span class="ml-2 text-sm font-normal text-gray-500">({{ new_count }} new)</span>
                     </h3>
                     
                     <div class="space-y-2">
-                        {% for flag in snapshot.drift_flags_as_current.all %}
-                        {% if flag.flag_type == 'new_undocumented' %}
+                        {% for flag in new_flags %}
                         <div class="border border-blue-200 bg-blue-50 rounded-lg p-3">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <h4 class="text-sm font-medium text-blue-900">
-                                        {{ flag.qualified_name }}
-                                    </h4>
-                                    <p class="text-xs text-blue-700">
-                                        {{ flag.detail.file_path }}:{{ flag.detail.line_number }}
-                                    </p>
+                                    <h4 class="text-sm font-medium text-blue-900">{{ flag.qualified_name }}</h4>
+                                    <p class="text-xs text-blue-700">{{ flag.detail.file_path }}:{{ flag.detail.line_number }}</p>
                                 </div>
-                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                                    new
-                                </span>
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">new</span>
                             </div>
                         </div>
-                        {% endif %}
                         {% endfor %}
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Signature Changed -->
+                {% if signature_flags %}
                 <div class="mb-8">
                     <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
                         <span class="w-3 h-3 rounded-full bg-purple-400 mr-2"></span>
                         Signature Changes
-                        <span class="ml-2 text-sm font-normal text-gray-500">
-                            ({{ signature_count }} changed)
-                        </span>
+                        <span class="ml-2 text-sm font-normal text-gray-500">({{ signature_count }} changed)</span>
                     </h3>
                     
                     <div class="space-y-4">
-                        {% for flag in snapshot.drift_flags_as_current.all %}
-                        {% if flag.flag_type == 'signature_changed' %}
+                        {% for flag in signature_flags %}
                         <div class="border border-purple-200 bg-purple-50 rounded-lg p-4">
-                            <h4 class="text-sm font-medium text-purple-900 mb-2">
-                                {{ flag.qualified_name }}
-                            </h4>
-                            <div class="text-xs text-purple-800">
-                                <div id="sig-diff-{{ flag.id }}"></div>
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <h4 class="text-sm font-medium text-purple-900">{{ flag.qualified_name }}</h4>
+                                    <p class="text-xs text-purple-700 mt-1">{{ flag.detail.file_path }}:{{ flag.detail.line_number }}</p>
+                                    <div class="mt-2 text-xs font-mono">
+                                        <div class="text-red-600">- {{ flag.detail.old_signature }}</div>
+                                        <div class="text-green-600">+ {{ flag.detail.new_signature }}</div>
+                                    </div>
+                                </div>
+                                <button onclick="toggleDiff('sig-{{ flag.id }}')"
+                                        class="ml-4 text-xs text-purple-800 hover:text-purple-900 underline">
+                                    View Diff
+                                </button>
+                            </div>
+                            <div id="sig-{{ flag.id }}" class="hidden mt-4">
+                                <div class="diff-container bg-white border rounded p-2"></div>
                             </div>
                         </div>
-                        {% endif %}
                         {% endfor %}
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Orphaned Documentation -->
+                {% if orphaned_flags %}
                 <div class="mb-8">
                     <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
                         <span class="w-3 h-3 rounded-full bg-red-400 mr-2"></span>
                         Orphaned Documentation
-                        <span class="ml-2 text-sm font-normal text-gray-500">
-                            ({{ orphaned_count }} orphaned)
-                        </span>
+                        <span class="ml-2 text-sm font-normal text-gray-500">({{ orphaned_count }} orphaned)</span>
                     </h3>
                     
                     <div class="space-y-2">
-                        {% for flag in snapshot.drift_flags_as_current.all %}
-                        {% if flag.flag_type == 'orphaned_doc' %}
+                        {% for flag in orphaned_flags %}
                         <div class="border border-red-200 bg-red-50 rounded-lg p-3">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <h4 class="text-sm font-medium text-red-900">
-                                        {{ flag.qualified_name }}
-                                    </h4>
-                                    <p class="text-xs text-red-700">
-                                        {{ flag.detail.file_path }}
-                                    </p>
+                                    <h4 class="text-sm font-medium text-red-900">{{ flag.qualified_name }}</h4>
+                                    <p class="text-xs text-red-700">{{ flag.detail.file_path }}</p>
                                 </div>
-                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                                    removed
-                                </span>
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">removed</span>
                             </div>
                         </div>
-                        {% endif %}
                         {% endfor %}
                     </div>
                 </div>
+                {% endif %}
+
+                {% if not stale_flags and not new_flags and not signature_flags and not orphaned_flags %}
+                <div class="text-center py-12 text-gray-500">
+                    <div class="text-4xl mb-4">✅</div>
+                    <p class="text-lg">No drift detected</p>
+                    <p class="text-sm mt-1">All documentation is up to date</p>
+                </div>
+                {% endif %}
             </div>
 
             <div class="mt-6 flex space-x-4">
@@ -154,6 +173,10 @@
                    class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
                     View Documentation
                 </a>
+                <button onclick="reanalyzeRepo({{ snapshot.repository.id }})"
+                        class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
+                    Re-analyze
+                </button>
                 <a href="{% url 'repositories:list' %}" 
                    class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
                     Back to Repositories
@@ -164,40 +187,78 @@
 </div>
 
 <script>
-function showDiff(flagId, oldHash, newHash) {
-    const diffContainer = document.getElementById(`diff-${flagId}`);
-    
-    if (diffContainer.classList.contains('hidden')) {
-        diffContainer.classList.remove('hidden');
-        
-        // Generate a simple unified diff
-        const diff = `--- Old Source (hash: ${oldHash.substring(0, 8)}...)
-+++ New Source (hash: ${newHash.substring(0, 8)}...)
-@@ -1,3 +1,3 @@
- def function():
--    old implementation
-+    new implementation
-     pass`;
-        
-        const diffHtml = Diff2Html.html(diff, {
-            drawFileList: false,
-            matching: 'lines',
-            outputFormat: 'side-by-side'
-        });
-        
-        diffContainer.querySelector('.diff-container').innerHTML = diffHtml;
-    } else {
-        diffContainer.classList.add('hidden');
+function getCSRFToken() {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        cookie = cookie.trim();
+        if (cookie.startsWith('csrftoken=')) {
+            return cookie.substring('csrftoken='.length);
+        }
     }
+    return '';
 }
 
-// Render signature diffs
-document.addEventListener('DOMContentLoaded', () => {
-    const sigDiffs = document.querySelectorAll('[id^="sig-diff-"]');
-    sigDiffs.forEach(el => {
-        const flagId = el.id.replace('sig-diff-', '');
-        // Signature diffs are rendered as simple code blocks
+function toggleDiff(id) {
+    const container = document.getElementById(id);
+    if (!container.classList.contains('hidden')) {
+        container.classList.add('hidden');
+        return;
+    }
+    container.classList.remove('hidden');
+    
+    // Find the flag data from the rendered template
+    const flagEl = container.closest('[data-old-source]');
+    if (!flagEl) return;
+    
+    const oldSource = flagEl.getAttribute('data-old-source') || '';
+    const newSource = flagEl.getAttribute('data-new-source') || '';
+    const fileName = flagEl.getAttribute('data-file') || 'code.py';
+    
+    const diff = `--- a/${fileName}\n+++ b/${fileName}\n` + generateUnifiedDiff(oldSource, newSource);
+    
+    const diffHtml = Diff2Html.html(diff, {
+        drawFileList: false,
+        matching: 'lines',
+        outputFormat: 'side-by-side'
     });
-});
+    
+    container.querySelector('.diff-container').innerHTML = diffHtml;
+}
+
+function generateUnifiedDiff(oldText, newText) {
+    const oldLines = oldText.split('\n');
+    const newLines = newText.split('\n');
+    let diff = '';
+    
+    const maxLen = Math.max(oldLines.length, newLines.length);
+    for (let i = 0; i < maxLen; i++) {
+        if (i < oldLines.length && i < newLines.length) {
+            if (oldLines[i] !== newLines[i]) {
+                diff += `@@ -${i+1} +${i+1} @@\n`;
+                diff += `-${oldLines[i]}\n`;
+                diff += `+${newLines[i]}\n`;
+            }
+        } else if (i < oldLines.length) {
+            diff += `-${oldLines[i]}\n`;
+        } else {
+            diff += `+${newLines[i]}\n`;
+        }
+    }
+    return diff || '@@ -0,0 +0 @@\n';
+}
+
+async function reanalyzeRepo(repoId) {
+    const response = await fetch(`/repositories/${repoId}/reanalyze/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'Content-Type': 'application/json'
+        }
+    });
+    const data = await response.json();
+    if (response.ok) {
+        window.location.href = `/analysis/${data.snapshot_id}/status/`;
+    }
+}
 </script>
 {% endblock %}

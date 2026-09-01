@@ -129,6 +129,10 @@ class DriftDetector:
                 'new_hash': curr_entity.source_hash,
                 'signature': curr_entity.signature,
                 'doc_is_outdated': curr_entity.doc_source == 'copied',
+                'old_source': (prev_entity.source_body or '')[:2000],
+                'new_source': (curr_entity.source_body or '')[:2000],
+                'file_path': curr_entity.file_path,
+                'line_number': curr_entity.line_number,
             }
         )
     
@@ -151,6 +155,10 @@ class DriftDetector:
             detail={
                 'old_signature': prev_entity.signature,
                 'new_signature': curr_entity.signature,
+                'old_source': (prev_entity.source_body or '')[:2000],
+                'new_source': (curr_entity.source_body or '')[:2000],
+                'file_path': curr_entity.file_path,
+                'line_number': curr_entity.line_number,
             }
         )
     

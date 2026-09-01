@@ -351,16 +351,19 @@ def drift_dashboard(request, snapshot_id):
         repository__owner=request.user
     )
     
-    drift_flags = snapshot.drift_flags_as_current.all()
-    stale_count = drift_flags.filter(flag_type='stale_doc').count()
-    new_count = drift_flags.filter(flag_type='new_undocumented').count()
-    signature_count = drift_flags.filter(flag_type='signature_changed').count()
-    orphaned_count = drift_flags.filter(flag_type='orphaned_doc').count()
+    stale_flags = snapshot.drift_flags_as_current.filter(flag_type='stale_doc')
+    new_flags = snapshot.drift_flags_as_current.filter(flag_type='new_undocumented')
+    signature_flags = snapshot.drift_flags_as_current.filter(flag_type='signature_changed')
+    orphaned_flags = snapshot.drift_flags_as_current.filter(flag_type='orphaned_doc')
     
     return render(request, 'analysis/drift.html', {
         'snapshot': snapshot,
-        'stale_count': stale_count,
-        'new_count': new_count,
-        'signature_count': signature_count,
-        'orphaned_count': orphaned_count,
+        'stale_count': stale_flags.count(),
+        'new_count': new_flags.count(),
+        'signature_count': signature_flags.count(),
+        'orphaned_count': orphaned_flags.count(),
+        'stale_flags': stale_flags,
+        'new_flags': new_flags,
+        'signature_flags': signature_flags,
+        'orphaned_flags': orphaned_flags,
     })
