@@ -109,9 +109,112 @@ class TestParserNestedClasses:
 
 class TestParserComplexModule:
     """Tests for parsing complex_module.py fixture."""
-    
+
     def test_finds_functions_with_complex_args(self, parser):
         entities = parser.parse_file(FIXTURES_DIR / 'complex_module.py')
         func = next((e for e in entities if e.name == 'function_with_complex_args'), None)
         assert func is not None
         assert '*' in func.signature or 'args' in func.signature
+
+
+class TestParserDocstringExcludedHash:
+    """Hashes must ignore docstring changes so docs-only commits don't drift."""
+
+    def test_changing_docstring_keeps_hash(self, parser, tmp_path):
+        f1 = tmp_path / 'mod.py'
+        f1.write_text('def f():\n    """Original doc."""\n    return 1\n')
+        f2 = tmp_path / 'mod2.py'
+        f2.write_text('def f():\n    """Updated documentation text."""\n    return 1\n')
+
+        e1 = parser.parse_file(f1)[0]
+        e2 = parser.parse_file(f2)[0]
+        assert e1.source_hash == e2.source_hash
+
+    def test_changing_body_changes_hash(self, parser, tmp_path):
+        f1 = tmp_path / 'm1.py'
+        f1.write_text('def f():\n    """Same."""\n    return 1\n')
+        f2 = tmp_path / 'm2.py'
+        f2.write_text('def f():\n    """Same."""\n    return 2\n')
+
+        e1 = parser.parse_file(f1)[0]
+        e2 = parser.parse_file(f2)[0]
+        assert e1.source_hash != e2.source_hash
+
+    def test_changing_class_docstring_keeps_hash(self, parser, tmp_path):
+        f1 = tmp_path / 'c1.py'
+        f1.write_text('class C:\n    """A class."""\n    x = 1\n')
+        f2 = tmp_path / 'c2.py'
+        f2.write_text('class C:\n    """A class, refined."""\n    x = 1\n')
+
+        e1 = parser.parse_file(f1)[0]
+        e2 = parser.parse_file(f2)[0]
+        assert e1.source_hash == e2.source_hash
+
+
+class TestParserAsyncSupport:
+    """Async functions must be parsed at module and class level."""
+
+    def test_async_function_at_module(self, parser, tmp_path):
+        f = tmp_path / 'a.py'
+        f.write_text('async def fetch(url: str) -> str:\n    return url\n')
+        entities = parser.parse_file(f)
+        assert len(entities) == 1
+        assert entities[0].name == 'fetch'
+        assert entities[0].signature.startswith('async def')
+
+    def test_async_method_in_class(self, parser, tmp_path):
+        f = tmp_path / 'c.py'
+        f.write_text('class C:\n    async def run(self):\n        return 1\n')
+        entities = parser.parse_file(f)
+        names = [(e.name, e.entity_type) for e in entities]
+        assert ('C', 'class') in names
+        methods = [e for e in entities if e.entity_type == 'function']
+        assert len(methods) == 1
+        assert methods[0].signature.startswith('async def')
+        assert methods[0].parent_qualified_name.endswith('.C')
+
+
+class TestParserSignatures:
+    """Signature string should be syntactically correct for tricky arg lists."""
+
+    def test_positional_only_marker(self, parser, tmp_path):
+        f = tmp_path / 'p.py'
+        f.write_text('def f(a, b, /, c):\n    return a + b + c\n')
+        sig = parser.parse_file(f)[0].signature
+        assert '/,' in sig or '/, c' in sig
+        assert sig.startswith('def f(')
+
+    def test_vararg_before_kwonly(self, parser, tmp_path):
+        f = tmp_path / 'k.py'
+        f.write_text('def f(*args, key=1):\n    return args, key\n')
+        sig = parser.parse_file(f)[0].signature
+        assert sig.index('*args') < sig.index('key')
+
+    def test_kwargs_last(self, parser, tmp_path):
+        f = tmp_path / 'kw.py'
+        f.write_text('def f(key=1, **opts):\n    return key, opts\n')
+        sig = parser.parse_file(f)[0].signature
+        assert sig.index('**opts') > sig.index('key')
+
+    def test_self_not_in_signature(self, parser, tmp_path):
+        f = tmp_path / 's.py'
+        f.write_text('class C:\n    def m(self, x):\n        return x\n')
+        methods = [e for e in parser.parse_file(f) if e.entity_type == 'function']
+        assert len(methods) == 1
+        assert 'self' not in methods[0].signature
+        assert 'x' in methods[0].signature
+
+
+class TestParserQualifiedNames:
+    """Qualified names must flow from module -> class -> method."""
+
+    def test_class_and_method_qualified(self, parser, tmp_path):
+        f = tmp_path / 'pkg' / 'mod.py'
+        f.parent.mkdir()
+        f.write_text('class A:\n    def b(self):\n        return 1\n')
+        entities = parser.parse_file(f, root_path=tmp_path)
+        cls = next(e for e in entities if e.entity_type == 'class')
+        mth = next(e for e in entities if e.entity_type == 'function')
+        assert cls.qualified_name == 'pkg.mod.A'
+        assert mth.qualified_name == 'pkg.mod.A.b'
+        assert mth.parent_qualified_name == 'pkg.mod.A'

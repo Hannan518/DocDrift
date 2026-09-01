@@ -8,44 +8,42 @@ A Django + JavaScript web application that analyzes Python codebases, auto-gener
 
 This project is **not a social network** and **not an e-commerce site**. It is a **code analysis and documentation tool** with the following unique characteristics:
 
-1. **AST-Based Static Analysis**: Uses Python's built-in `ast` module to parse Python source code, extracting modules, classes, and functions with full signature analysis and source hashing.
+1. **AST-Based Static Analysis** — Uses Python's built-in `ast` module to parse Python source code, extracting classes, async functions, and nested method hierarchies with full signature analysis. Source hashes strip docstrings so docs-only commits never trigger false drift.
 
-2. **LLM Integration for Documentation**: Integrates with Google's Gemini AI API to automatically generate Google-style docstrings for undocumented code.
+2. **LLM Integration for Documentation** — Integrates with Google's Gemini API to generate Google-style docstrings for undocumented code, with fast-fail on auth errors, retry on transient failures, and graceful handling of empty/malformed responses.
 
-3. **Temporal Drift Detection**: Implements a sophisticated algorithm that compares snapshots over time to detect four types of documentation drift:
-   - **Stale Documentation**: Code changed but documentation wasn't updated
-   - **New Undocumented Code**: New entities added without documentation
-   - **Orphaned Documentation**: Documented code that was removed
-   - **Signature Changes**: Function/method signatures that changed
+3. **Temporal Drift Detection** — Compares successive snapshots and produces four flag types: `stale_doc` (code changed), `new_undocumented` (new code with no doc), `orphaned_doc` (documented code that was removed), and `signature_changed` (public interface changed). The detector is idempotent (re-running on the same pair produces the same flags) and stores real unified diffs in each flag for direct rendering.
 
-4. **Intelligent Documentation Copying**: Avoids redundant LLM calls by copying documentation forward for unchanged code, conserving API quota and processing time.
+4. **Resume-Safe Client Orchestrator** — A small JS state machine drives a five-phase pipeline (prepare → parse → copyDocs → genDocs → drift). Each phase is restartable: a closed-tab refresh picks up where it left off without re-doing work or losing data.
 
 ### Why This Project is Complex
 
-1. **Multi-Model Relational Database Design**:
+1. **Relational Snapshot Model**
    - `Repository` → `Snapshot` (one-to-many)
-   - `Snapshot` → `CodeEntity` (one-to-many with self-referential parent relationships)
-   - `DriftFlag` → multiple ForeignKeys to track relationships across snapshots
-   - Unique constraints and indexes for performance
+   - `Snapshot` → `CodeEntity` (one-to-many, self-referential `parent` for class→method nesting)
+   - `DriftFlag` (multiple FKs to track relationships across snapshots)
+   - `unique_together('owner','name')` on `Repository` — re-submitting re-uses the repo with a fresh snapshot
 
-2. **Micro-Batch Architecture**:
-   - Designed to work within undocumented platform timeout constraints
-   - Client-side orchestration with multi-phase pipeline
-   - Batch processing with configurable sizes (10 files for parsing, 5 entities for doc generation)
+2. **Cursor-Based Doc Generation**
+   - The LLM work-set shrinks as entities become documented; offset pagination skips entities, so a `after_id` cursor (`id__gt`) is the only correct primitive
+   - Workers call the LLM only; the main thread performs a single `bulk_update` to avoid concurrent SQLite writes
+   - The endpoint exposes `next_after_id` (null when exhausted) plus `remaining`, `succeeded`, `failed` so the client can bound retries
 
-3. **Algorithmic Complexity**:
-   - Source code hashing with normalization (formatting-independent change detection)
-   - Qualified name matching across snapshots for drift detection
-   - Differential documentation strategy (copy vs. regenerate decision logic)
+3. **Algorithmic Detail**
+   - Docstring-stripped source hashing — `_unparse_without_own_docstring` removes the first `Expr(Constant(str))` before hashing
+   - Qualified-name matching across snapshots (`module.Class.method`) for drift detection
+   - Signature extraction with positional-only marker, `*args` before kw-only, `**kwargs` last, `self/cls` removal, `async def` prefix
 
-4. **Production-Grade Error Handling**:
-   - Rate limit handling with exponential backoff for Gemini API
-   - Model fallback (gemini-3.6-flash → gemini-3.5-flash)
-   - Graceful degradation on parse failures
+4. **Production-Grade Error Handling**
+   - Shared `parse_json_body` helper — every POST view returns 400 on malformed JSON
+   - `LLMConfigError` fast-fail for missing/invalid API keys (no per-entity silent swallow)
+   - `response.text` None guard, exponential backoff (1s → 2s → 4s), model fallback
+   - Zero-file validation in `prepare_analysis` rejects empty repos with a clear error
+   - SQLite WAL + `init_command` for concurrent read safety
 
-5. **State Machine Implementation**:
-   - Snapshot status progression: pending → parsing → generating_docs → detecting_drift → complete
-   - Client-side orchestration coordinating multiple backend endpoints
+5. **State Machine**
+   - Snapshot status: `pending → ready_to_parse → parsing → parsing_complete → generating_docs → docs_complete → detecting_drift → complete` (or `failed` at any step)
+   - `error_message` stored on the snapshot; surfaced in the UI and on the JSON progress endpoint
 
 ## File Structure
 
@@ -53,310 +51,193 @@ This project is **not a social network** and **not an e-commerce site**. It is a
 Capstone/
 ├── manage.py                      # Django management script
 ├── requirements.txt               # Python dependencies
-├── runtime.txt                    # Python version for deployment
-├── pytest.ini                     # Pytest configuration
+├── pytest.ini                     # Pytest configuration (collects all app tests)
 ├── .env.example                   # Environment variable template
-├── .gitignore                     # Git ignore rules
 │
-├── capstone/                      # Django project settings
-│   ├── settings.py                # Main settings (DB, apps, static, media, Gemini API key)
+├── capstone/                      # Django project
+│   ├── settings.py                # DB, apps, static, Gemini key, SQLite WAL
 │   ├── urls.py                    # Root URL configuration
-│   ├── wsgi.py                    # WSGI entry point for deployment
-│   └── asgi.py                    # ASGI entry point
+│   ├── utils.py                   # parse_json_body() shared helper
+│   └── tests.py                   # Tests for the shared helper
 │
-├── accounts/                      # User authentication (minimal)
-│   ├── models.py                  # User model extensions (if needed)
-│   ├── views.py                   # Login, register, logout
-│   └── admin.py                   # Admin registration
+├── accounts/                      # User authentication
+│   ├── views.py                   # landing, register
+│   ├── tests.py                   # Landing + registration tests
+│   └── admin.py
 │
 ├── repositories/                  # Repository ingestion
-│   ├── models.py                  # Repository model (GitHub URL or zip upload)
-│   ├── views.py                   # Submit, prepare, list repositories
-│   ├── urls.py                    # Repository URL patterns
-│   ├── ingestion.py               # GitHub clone + zip extraction logic
-│   ├── validators.py              # File count, URL, upload validation
-│   └── admin.py                   # Admin panel for repositories
+│   ├── models.py                  # Repository model (owner + name unique)
+│   ├── views.py                   # submit, prepare, list, detail, reanalyze, delete
+│   ├── urls.py
+│   ├── ingestion.py               # GitHub clone + temp-dir cleanup
+│   ├── validators.py              # File count, URL validation
+│   └── tests.py
 │
 ├── analysis/                      # Core analysis engine
-│   ├── models.py                  # Snapshot, CodeEntity, DriftFlag models
-│   ├── views.py                   # Micro-batch endpoints (parse, generate-docs, detect-drift)
-│   ├── urls.py                    # Analysis URL patterns
-│   ├── parser.py                  # AST-based Python parser (standalone, testable)
-│   ├── drift_detector.py          # Snapshot comparison and drift flagging
-│   ├── constants.py               # Batch sizes, limits (tunable after benchmarking)
-│   ├── admin.py                   # Admin for snapshots, entities, drift flags
-│   └── tests/                     # Unit tests
-│       ├── test_parser.py         # Parser tests with fixtures
-│       ├── test_drift.py          # Drift detection tests
-│       └── fixtures/              # Sample Python files for testing
-│           ├── simple.py
-│           ├── nested_classes.py
-│           └── complex_module.py
+│   ├── models.py                  # Snapshot, CodeEntity, DriftFlag
+│   ├── views.py                   # Micro-batch endpoints (parse, prepare-docs,
+│   │                              #   generate-docs-batch, detect-drift, progress)
+│   ├── urls.py
+│   ├── parser.py                  # AST-based Python parser (async, signature, hash)
+│   ├── drift_detector.py          # Idempotent snapshot comparison with unified diffs
+│   ├── constants.py               # PARSING_BATCH_SIZE, DOC_GEN_BATCH_SIZE
+│   └── tests/
+│       ├── test_parser.py         # Async, docstring-excluded hashes, signatures
+│       ├── test_drift.py          # Idempotency, flag conditions, unified diff
+│       ├── test_docgen_cursor.py  # Cursor pagination, termination, no skips
+│       └── fixtures/              # simple.py, nested_classes.py, complex_module.py
 │
 ├── llm/                           # LLM integration (swappable)
-│   ├── base.py                    # Abstract base class for LLM providers
-│   ├── gemini.py                  # Gemini API client with retry logic
-│   ├── prompts.py                 # Google-style docstring prompt templates
-│   └── tests.py                   # LLM integration tests (mocked)
+│   ├── base.py                    # LLMConfigError
+│   ├── gemini.py                  # Gemini client (retry, fallback, auth fail-fast)
+│   ├── prompts.py                 # Google-style docstring templates
+│   └── tests.py                   # LLM tests (mocked)
 │
 ├── templates/                     # HTML templates
-│   ├── base.html                  # Base template with Tailwind CSS CDN
-│   ├── accounts/                  # Login, register templates
-│   ├── repositories/
-│   │   ├── submit.html            # Repository submission form
-│   │   └── list.html              # User's repositories list
-│   └── analysis/
-│       ├── status.html            # Analysis progress with orchestrator
-│       ├── browser.html           # Documentation browser
-│       └── drift.html             # Drift dashboard
+│   ├── base.html                  # Theme toggle, nav, toast container
+│   ├── landing.html               # Marketing landing page (logged-out only)
+│   ├── registration/              # Branded login + register
+│   ├── repositories/              # list, submit, detail
+│   └── analysis/                  # status, browser, drift
 │
 └── static/                        # Static files
-    └── css/
-        └── custom.css             # Additional styles (minimal)
+    ├── css/main.css               # Design system (light + dark, all components)
+    └── js/
+        ├── app.js                 # CSRF, fetch, toast, theme toggle, mobile nav
+        └── pages/                 # list, submit, detail, status, browser, drift
 ```
 
 ## How It Works
 
 ### Phase 1: Repository Submission
-User submits a GitHub repository URL. The system validates the URL and creates a `Repository` and initial `Snapshot` record.
+User submits a public GitHub URL on `/repositories/submit/`. The system validates the URL, looks up the repo by `(owner, name)`, and creates a new `Snapshot` (or reuses the existing `Repository`).
 
 ### Phase 2: Preparation (Clone & Validate)
-- Shallow clone (depth=1) from GitHub for speed
-- Validate Python file count against limits (default: 100 files max)
-- Store temporary path for processing
+- Shallow clone (`depth=1`) into a temp directory
+- Validate Python file count; reject zero-file repos with a clear error
+- Capture the `commit_hash` so each snapshot is immutable
+- The temp directory is cleaned up after drift detection completes
 
 ### Phase 3: Parsing (Batch Processing)
-- Parse Python files in batches of 10
-- Use `ast` module to extract:
-  - Module-level functions
-  - Classes and their public methods
-  - Function signatures with type hints
-  - Existing docstrings
-  - Source code hashes (SHA256 of normalized body)
-- Create `CodeEntity` records in database
+- Parse Python files in batches of 10 (`PARSING_BATCH_SIZE`)
+- For each file, the AST parser produces one `CodeEntity` per class, per public method, and per module-level function (including `async def`)
+- Signatures preserve positional-only markers, `*args` before kw-only, `**kwargs` last; `self`/`cls` is removed from method signatures
+- Source hashes are computed on the docstring-stripped body so docs-only edits never trigger drift
+- After each batch, class→method `parent` links are wired via a single `bulk_update` keyed on `qualified_name`
 
 ### Phase 4: Smart Documentation Preparation
-- If this is a subsequent snapshot (not first):
-  - Match entities by `qualified_name` against previous snapshot
-  - For unchanged code (`source_hash` matches): Copy documentation forward
-  - For changed code: Leave `generated_docstring` as NULL (will be flagged as stale)
-  - For new code: Leave NULL for generation
+- If a previous complete snapshot exists, `prepare_docs` copies generated docs forward for entities whose `source_hash` is unchanged
+- Changed or new code is left for the LLM
+- `doc_source` is set to `existing` for entities that already have a docstring in the source — these are also counted as documented
 
-### Phase 5: Documentation Generation (Batch Processing)
-- Generate docstrings ONLY for genuinely new entities (batch size: 5)
-- Call Gemini API with entity signature + source body
-- Rate limit handling:
-  - Exponential backoff on 429 errors (1s, 2s, 4s, 8s)
-  - Model fallback (gemini-3.6-flash → gemini-3.5-flash)
-- Store generated docstring with timestamp
+### Phase 5: Documentation Generation (Cursor-Batched)
+- The work-set is `entities.filter(generated_docstring__isnull=True, existing_docstring__isnull=True)` — a snapshot, not a filter on the original queryset
+- The client sends `after_id`; the server returns up to `DOC_GEN_BATCH_SIZE` entities with `id > after_id` plus `next_after_id` (null when exhausted)
+- 10 worker threads call the LLM; results are written back from the request thread in one `bulk_update`
+- A `LLMConfigError` (bad API key) aborts the whole batch with a clear `error_message`
+- The client loops until `next_after_id` is null, then attempts up to a small number of retry rounds for any remaining failures
 
 ### Phase 6: Drift Detection
-- Compare current snapshot with previous snapshot
-- Flag four types of drift:
-  1. **Stale Doc**: `source_hash` changed but doc was copied (now outdated)
-  2. **New Undocumented**: Entity exists in current but not previous
-  3. **Orphaned Doc**: Entity exists in previous but not current
-  4. **Signature Changed**: Function/method signature string differs
-- Bulk create `DriftFlag` records
+- Compare the current snapshot to the most recent prior `complete` snapshot by `timestamp`
+- For each `qualified_name`:
+  - new + undocumented → `new_undocumented`
+  - hash changed → `stale_doc` (with full unified diff in `detail`)
+  - signature changed → `signature_changed` (with full unified diff in `detail`)
+  - removed + previously documented → `orphaned_doc`
+- Idempotent: prior flags for the current snapshot are deleted first
+- The diff text is stored in `DriftFlag.detail['unified_diff']` and rendered by the JS on demand (no client-side diffing required)
 
-### Client-Side Orchestration
-JavaScript class (`AnalysisOrchestrator`) coordinates the multi-phase pipeline:
-1. Calls endpoints sequentially
-2. Updates progress bar (0-100%)
-3. Handles errors gracefully
-4. Redirects to documentation browser on completion
+### Client-Side Orchestrator
+`static/js/pages/status.js` runs an explicit phase state machine (`prepare → parse → copyDocs → genDocs → drift`) keyed off the snapshot's persisted status. The browser never relies on offset pagination or in-memory queues, and a refresh of the status page resumes the right phase.
 
 ## Setup Instructions
 
 ### Prerequisites
-- Python 3.12
+- Python 3.12+
 - Git
-- Gemini API key (get from https://aistudio.google.com/)
+- Gemini API key (https://aistudio.google.com/)
 
 ### Local Development
 
-1. **Clone the repository**:
 ```bash
+# 1. Clone
 git clone <your-repo-url>
 cd Capstone
-```
 
-2. **Create virtual environment**:
-```bash
+# 2. Virtualenv
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-```
+source venv/bin/activate          # Windows: venv\Scripts\activate
 
-3. **Install dependencies**:
-```bash
+# 3. Dependencies
 pip install -r requirements.txt
-```
 
-4. **Set environment variables**:
-```bash
+# 4. Environment
 cp .env.example .env
-# Edit .env and add your GEMINI_API_KEY
-```
+# Edit .env and set GEMINI_API_KEY
+# (DJANGO_SECRET_KEY defaults to a dev value when unset)
 
-5. **Run migrations**:
-```bash
+# 5. Migrate
 python manage.py migrate
-```
 
-6. **Create superuser**:
-```bash
+# 6. (Optional) Admin
 python manage.py createsuperuser
-```
 
-7. **Run development server**:
-```bash
+# 7. Run
 python manage.py runserver
 ```
 
-8. **Access the application**:
-- Main app: http://localhost:8000/repositories/
-- Admin panel: http://localhost:8000/admin/
+- Marketing landing: http://localhost:8000/
+- App: http://localhost:8000/repositories/
+- Admin: http://localhost:8000/admin/
 
 ### Running Tests
 ```bash
 python -m pytest
 ```
+The test runner uses pytest-django with `pytest.ini` and collects all app-level tests.
 
-## Deployment to Render
+## Design Decisions
 
-### Prerequisites
-- Render account (https://render.com)
-- GitHub repository with this code
-- Gemini API key
+### Cursor over Offset
+Offset pagination on a shrinking queryset is the classic source of "infinite loop" bugs. `after_id` is stable: even as entities leave the work-set, the cursor always points to the next unseen id.
 
-### Steps
+### Docstring-Stripped Hashes
+A docs-only commit (e.g. someone improving an existing docstring) should not flag every method as `stale_doc`. Hashing the docstring-stripped body means only real source changes count.
 
-1. **Create PostgreSQL database**:
-   - In Render dashboard: New → PostgreSQL
-   - Select Free tier
-   - Note: Free tier has 30-day limit, then data is deleted
+### Idempotent Drift
+Re-running the pipeline for any reason should not pile up duplicate flags. Deleting prior flags for the current snapshot before creating new ones makes the detector safe to call repeatedly.
 
-2. **Create Web Service**:
-   - New → Web Service
-   - Connect your GitHub repository
-   - Configuration:
-     - **Name**: docgen-web (or your choice)
-     - **Environment**: Python 3
-     - **Build Command**: `pip install -r requirements.txt && python manage.py migrate`
-     - **Start Command**: `gunicorn capstone.wsgi`
-     - **Instance Type**: Free
+### Server-Side Diffs
+Diffs are computed once with `difflib.unified_diff` and stored on the flag, so the browser never needs a diff library and the diff is part of the persisted record.
 
-3. **Set Environment Variables**:
-   - In web service settings → Environment:
-     - `DJANGO_SECRET_KEY`: (auto-generate via Render)
-     - `GEMINI_API_KEY`: (paste your key from Google AI Studio)
-     - `PYTHON_VERSION`: 3.12.0
-     - `DEBUG`: False
-     - `ALLOWED_HOSTS`: your-app.onrender.com
-     - `DATABASE_URL`: (auto-set by connecting Postgres database)
+### Worker DB Discipline
+SQLite serializes writes. The doc-gen workers only call the LLM and return their result tuple; a single main-thread `bulk_update` writes them all.
 
-4. **Connect Database**:
-   - In web service settings → Environment
-   - Add the PostgreSQL database you created in step 1
-
-5. **Deploy**:
-   - Render will automatically deploy on git push
-   - First deploy takes ~5 minutes
-   - Check logs for any errors
-
-### Important Render Notes
-- **Free tier limitations**:
-  - Web service spins down after 15 minutes of inactivity
-  - First request after spin-down takes ~30 seconds
-  - Database limited to 30 days then deleted
-- **No background workers on free tier**: This is why we use micro-batch architecture with client-side orchestration
-
-## Getting a Gemini API Key
-
-1. Visit https://aistudio.google.com/
-2. Sign in with Google account
-3. Click "Get API key" → "Create API key"
-4. Copy the key to your `.env` file
-5. **Free tier limits**:
-   - 15 requests per minute
-   - 1 million tokens per day
-   - Sufficient for demo-scale repos (~30 files)
-
-## Technical Decisions
-
-### Micro-Batch Architecture
-**Problem**: Render's free-tier request timeout isn't publicly documented. Industry standard for free PaaS platforms is 30 seconds.
-
-**Solution**: Micro-batch processing keeps every request under 15 seconds:
-- Parsing: 10 files per batch (~5s per batch)
-- Doc generation: 5 entities per batch (<10s worst case with retries)
-- Client orchestrates sequentially
-
-This design provides margin for any plausible timeout limit rather than risking a single long-running request.
-
-### Documentation as a Review Gate, Not Auto-Fix
-The application **deliberately does not auto-regenerate documentation** when code changes:
-- **First snapshot**: All entities get LLM-generated docs
-- **Subsequent snapshots**:
-  - Unchanged code → docs copied forward
-  - Changed code → flagged as `stale_doc` but NOT regenerated
-  - New code → docs generated automatically
-
-**Why?**
-- Conserves LLM quota (only calls Gemini for new code)
-- User review gate (drift flags require manual inspection)
-- More complex workflow than silent batch rewrite
-
-### Source Hashing for Change Detection
-Uses SHA256 of **normalized** source body:
-- Strips extraneous whitespace
-- Collapses multiple newlines
-- Formatting-only changes don't trigger drift flags
-
-### Why AST over Regex?
-- Robust handling of nested structures (classes within modules, methods within classes)
-- Handles Python's indentation-based syntax reliably
-- No fragility from edge cases
-
-### Gemini Model Selection
-Primary: `gemini-3.6-flash` (user-specified, faster)
-Fallback: `gemini-3.5-flash` (stable, widely available)
-
-Rate limit handling: exponential backoff (1s → 2s → 4s → 8s)
+### UI: Light + Dark Toggle
+- CSS variables only (`[data-theme="dark"]` selector + `prefers-color-scheme` fallback)
+- No CSS framework runtime — a single hand-crafted stylesheet in `static/css/main.css`
+- Theme persisted in `localStorage`; toggle is in the nav bar
 
 ## Intentional Scope Limitations
 
-These are documented as deliberate engineering decisions, not oversights:
-
-1. **Python-only**: No JavaScript/TypeScript support (would require different AST parser)
-2. **Public repos only**: No GitHub OAuth or private repo access (security/scope)
-3. **Manual analysis**: No webhook triggers or CI/CD integration (deployment complexity)
-4. **Best-effort static analysis**: Cannot resolve dynamic/metaprogrammed code
-5. **No nested class support**: Parser extracts top-level classes and their methods, but not classes inside classes
-6. **Not containerized**: Direct deployment via Render's Python buildpack (simpler for demo)
+1. **Python-only** — AST is language-specific; other languages would need a different parser.
+2. **Public repos only** — No GitHub OAuth for private repos.
+3. **No nested-class extraction** — Top-level classes and their public methods are parsed; classes inside classes are not recursed into.
+4. **No webhook triggers** — Analysis is started from the UI.
+5. **Best-effort static analysis** — Dynamic / metaprogrammed code is not resolved.
 
 ## Known Limitations
 
-- **Temporary directory cleanup**: Cloned repos are not automatically cleaned up. For production, implement a periodic cleanup task to remove directories older than 24 hours.
-- **No resume capability**: If user closes browser during analysis, they must re-submit. Analysis state is persisted but no UI for resuming.
-- **Limited to small repos**: Configured for repos with <100 Python files. Larger repos may exceed free-tier timeout limits.
+- **Repo size**: Configured for repos with <100 Python files (raises a clear validation error otherwise).
+- **Re-submitting the same repo** triggers a fresh snapshot and a new analysis run.
 
 ## Future Enhancements (Out of Scope)
 
-- Multi-language support (requires language-specific AST parsers)
-- GitHub App integration for private repos and webhook triggers
-- Custom LLM fine-tuning for domain-specific documentation
-- Line-level diff visualization (currently shows hash/signature changes)
-- Export documentation to Markdown/HTML
+- Multi-language AST parsers
+- GitHub App for private repos + webhooks on push
+- Line-level annotations in the diff view
+- Export to Markdown / HTML
 
 ## License
 
-CS50W Capstone Project - Educational Use
-
-## Author
-
-CS50W Student - 2026
-
----
-
-**Built with**: Django 5.1.1, Google Gemini AI, Tailwind CSS, Python 3.12
+CS50W Capstone Project — Educational Use
