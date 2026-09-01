@@ -1,300 +1,87 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Analysis Status{% endblock %}
+{% block title %}Analyzing {{ snapshot.repository.name }} — DocGen{% endblock %}
 
 {% block content %}
-<div class="px-4 sm:px-0">
-    <div class="mb-8">
-        <a href="{% url 'repositories:list' %}" class="text-sm text-blue-600 hover:text-blue-500">&larr; Back to Repositories</a>
-        <h1 class="text-3xl font-bold text-gray-900 mt-2">Analysis in Progress</h1>
+<div class="container">
+    <div class="page-header">
+        <div>
+            <div class="eyebrow"><a href="{% url 'repositories:detail' snapshot.repository.id %}">&larr; {{ snapshot.repository.name }}</a></div>
+            <h1>Analysis #{{ snapshot.id }}</h1>
+            <p class="sub">
+                {% if snapshot.commit_hash %}<span class="mono">{{ snapshot.commit_hash|slice:":7" }}</span> · {% endif %}
+                started {{ snapshot.timestamp|date:'M j, Y H:i' }}
+            </p>
+        </div>
     </div>
 
-    <div class="bg-white shadow sm:rounded-lg mb-6">
-        <div class="px-4 py-5 sm:p-6">
-            <!-- Step Indicator -->
-            <div class="mb-8">
-                <div class="flex items-center justify-between">
-                    <div id="step-1" class="flex flex-col items-center step">
-                        <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600 step-circle">1</div>
-                        <span class="text-xs text-gray-500 mt-1">Prepare</span>
-                    </div>
-                    <div class="flex-1 h-1 bg-gray-200 mx-2 step-line" id="line-1"></div>
-                    <div id="step-2" class="flex flex-col items-center step">
-                        <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600 step-circle">2</div>
-                        <span class="text-xs text-gray-500 mt-1">Parse</span>
-                    </div>
-                    <div class="flex-1 h-1 bg-gray-200 mx-2 step-line" id="line-2"></div>
-                    <div id="step-3" class="flex flex-col items-center step">
-                        <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600 step-circle">3</div>
-                        <span class="text-xs text-gray-500 mt-1">Copy Docs</span>
-                    </div>
-                    <div class="flex-1 h-1 bg-gray-200 mx-2 step-line" id="line-3"></div>
-                    <div id="step-4" class="flex flex-col items-center step">
-                        <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600 step-circle">4</div>
-                        <span class="text-xs text-gray-500 mt-1">Generate Docs</span>
-                    </div>
-                    <div class="flex-1 h-1 bg-gray-200 mx-2 step-line" id="line-4"></div>
-                    <div id="step-5" class="flex flex-col items-center step">
-                        <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600 step-circle">5</div>
-                        <span class="text-xs text-gray-500 mt-1">Drift</span>
-                    </div>
+    <div class="card card-pad">
+        <!-- Stepper -->
+        <div class="stepper" id="stepper">
+            <div class="step" data-step="1"><div class="step__circle">1</div><span class="step__label">Clone</span></div>
+            <div class="step-line" data-line="1"></div>
+            <div class="step" data-step="2"><div class="step__circle">2</div><span class="step__label">Parse</span></div>
+            <div class="step-line" data-line="2"></div>
+            <div class="step" data-step="3"><div class="step__circle">3</div><span class="step__label">Copy docs</span></div>
+            <div class="step-line" data-line="3"></div>
+            <div class="step" data-step="4"><div class="step__circle">4</div><span class="step__label">Generate</span></div>
+            <div class="step-line" data-line="4"></div>
+            <div class="step" data-step="5"><div class="step__circle">5</div><span class="step__label">Drift</span></div>
+        </div>
+
+        <!-- Status + progress -->
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+            <p id="status-message" class="muted">Initializing…</p>
+            <span id="progress-text" class="mono muted">0%</span>
+        </div>
+        <div class="progress"><div class="progress__bar" id="progress-bar"></div></div>
+
+        <div id="error-container" class="error-banner hidden" style="margin-top:18px;" role="alert">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="flex-shrink:0;margin-top:2px;"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            <div>
+                <div id="error-message"></div>
+                <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+                    <button type="button" class="btn btn--secondary btn--sm" id="retry-btn">Retry</button>
+                    <a href="{% url 'repositories:detail' snapshot.repository.id %}" class="btn btn--ghost btn--sm">Back to repository</a>
                 </div>
             </div>
+        </div>
 
-            <!-- Status Message -->
-            <div class="mb-6">
-                <h2 class="text-lg font-medium text-gray-900 mb-2">Current Status</h2>
-                <p id="status-message" class="text-sm text-gray-600">Initializing...</p>
-            </div>
+        <div id="success-banner" class="hidden" style="margin-top:18px; display:flex; align-items:center; gap:10px; color: var(--success);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8.5 12.5 2.5 2.5 5-6"/></svg>
+            <span id="success-message">Analysis complete.</span>
+        </div>
+    </div>
 
-            <!-- Progress Bar -->
-            <div class="mb-6">
-                <div class="flex justify-between mb-2">
-                    <span class="text-sm font-medium text-gray-700">Progress</span>
-                    <span id="progress-text" class="text-sm font-medium text-gray-700">0%</span>
-                </div>
-                <div class="w-full bg-gray-200 rounded-full h-2.5">
-                    <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                </div>
-            </div>
-
-            <!-- Error Container -->
-            <div id="error-container" class="hidden rounded-md bg-red-50 p-4 mb-6">
-                <div class="flex">
-                    <div class="ml-3">
-                        <h3 class="text-sm font-medium text-red-800">Error</h3>
-                        <div class="mt-2 text-sm text-red-700" id="error-message"></div>
-                        <button onclick="window.location.reload()" 
-                                class="mt-3 text-sm text-red-800 underline hover:text-red-900">
-                            Retry
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Info -->
-            <div class="bg-gray-50 rounded-md p-4">
-                <h3 class="text-sm font-medium text-gray-900 mb-2">What's happening?</h3>
-                <ul class="text-sm text-gray-600 space-y-1">
-                    <li>1. Cloning repository and validating file count</li>
-                    <li>2. Parsing Python files via AST (batches of 10)</li>
-                    <li>3. Copying unchanged docs from previous snapshot</li>
-                    <li>4. Generating docs for new/changed entities via Gemini</li>
-                    <li>5. Detecting drift from previous snapshot</li>
-                </ul>
-            </div>
+    <div style="margin-top:14px;">
+        <div class="info-note">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="flex-shrink:0;margin-top:2px;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <span>You can close this tab — the analysis state is saved, and reopening this page resumes where it left off.</span>
         </div>
     </div>
 </div>
+{% endblock %}
 
-<style>
-.step-circle.active { background-color: #3b82f6; color: white; }
-.step-circle.done { background-color: #10b981; color: white; }
-.step-circle.error { background-color: #ef4444; color: white; }
-.step-line.active { background-color: #3b82f6; }
-.step-line.done { background-color: #10b981; }
-</style>
-
+{% block extra_js %}
 <script>
-class AnalysisOrchestrator {
-    constructor(snapshotId, currentStatus) {
-        this.snapshotId = snapshotId;
-        this.currentStatus = currentStatus;
-        this.parsingBatchSize = 10;
-        this.docGenBatchSize = 20;
+window.DOCGEN_SNAPSHOT = {
+    id: {{ snapshot.id }},
+    status: '{{ snapshot.status|escapejs }}',
+    progress: {{ snapshot.progress_percent|default:0 }},
+    repoId: {{ snapshot.repository.id }},
+    repoName: '{{ snapshot.repository.name|escapejs }}',
+    urls: {
+        prepare: '{% url "repositories:prepare" snapshot.id %}',
+        parseBatch: '{% url "analysis:parse_batch" snapshot.id %}',
+        prepareDocs: '{% url "analysis:prepare_docs" snapshot.id %}',
+        generateDocs: '{% url "analysis:generate_docs_batch" snapshot.id %}',
+        detectDrift: '{% url "analysis:detect_drift" snapshot.id %}',
+        browser: '{% url "analysis:browser" snapshot.id %}',
+        repoDetail: '{% url "repositories:detail" snapshot.repository.id %}'
     }
-    
-    setStep(stepNum, state) {
-        const circle = document.querySelector(`#step-${stepNum} .step-circle`);
-        const line = document.getElementById(`line-${stepNum}`);
-        if (circle) {
-            circle.classList.remove('active', 'done', 'error');
-            if (state === 'active') circle.classList.add('active');
-            else if (state === 'done') circle.classList.add('done');
-            else if (state === 'error') circle.classList.add('error');
-        }
-        if (line) {
-            line.classList.remove('active', 'done');
-            if (state === 'done') line.classList.add('done');
-            else if (state === 'active') line.classList.add('active');
-        }
-    }
-    
-    markStepsDone(upTo) {
-        for (let i = 1; i <= upTo; i++) {
-            this.setStep(i, 'done');
-        }
-        if (upTo < 5) this.setStep(upTo + 1, 'active');
-    }
-    
-    async runFromStatus() {
-        const s = this.currentStatus;
-        
-        if (s === 'complete') {
-            window.location.href = `/analysis/${this.snapshotId}/browser/`;
-            return;
-        }
-        
-        if (s === 'failed') {
-            this.showError('Analysis failed. Go back and re-analyze.');
-            return;
-        }
-        
-        try {
-            if (s === 'pending') {
-                this.markStepsDone(0);
-                this.updateUI('Cloning repository...', 2);
-                await this.prepare();
-                this.setStep(1, 'done');
-            }
-            
-            if (['ready_to_parse', 'parsing', 'parsing_complete'].includes(s)) {
-                this.markStepsDone(1);
-                if (s !== 'parsing_complete') {
-                    this.updateUI('Parsing files...', 5);
-                    await this.runParsing();
-                }
-                this.setStep(2, 'done');
-            }
-            
-            if (['parsing_complete', 'generating_docs', 'docs_complete'].includes(s)) {
-                this.markStepsDone(2);
-                if (s !== 'docs_complete') {
-                    await this.prepareDocs();
-                    this.updateUI('Generating documentation...', 35);
-                    await this.runDocGeneration();
-                }
-                this.setStep(4, 'done');
-            }
-            
-            if (['docs_complete', 'detecting_drift', 'complete'].includes(s)) {
-                this.markStepsDone(4);
-                if (s !== 'complete') {
-                    await this.runDriftDetection();
-                }
-                this.setStep(5, 'done');
-            }
-            
-            this.updateUI('Analysis complete!', 100);
-            await this.sleep(1000);
-            window.location.href = `/analysis/${this.snapshotId}/browser/`;
-            
-        } catch (error) {
-            this.showError(error.message);
-        }
-    }
-    
-    async prepare() {
-        const data = await this.fetchJSON(
-            `/repositories/${this.snapshotId}/prepare/`,
-            { method: 'POST' }
-        );
-        if (!data.ok) throw new Error(data.data.error || 'Preparation failed');
-    }
-    
-    async runParsing() {
-        let offset = 0;
-        while (true) {
-            const data = await this.fetchJSON(
-                `/analysis/${this.snapshotId}/parse-batch/`,
-                { method: 'POST', body: JSON.stringify({ offset, limit: this.parsingBatchSize }) }
-            );
-            if (!data.ok) throw new Error('Parsing failed: ' + (data.data.error || 'Unknown error'));
-            const total = data.data.total;
-            const progress = 5 + ((offset + data.data.parsed) / total) * 25;
-            this.updateUI(`Parsing files (${offset + data.data.parsed}/${total})`, Math.round(progress));
-            if (!data.data.next_offset) break;
-            offset = data.data.next_offset;
-            await this.sleep(50);
-        }
-    }
-    
-    async prepareDocs() {
-        const data = await this.fetchJSON(
-            `/analysis/${this.snapshotId}/prepare-docs/`,
-            { method: 'POST' }
-        );
-        if (data.ok) {
-            this.updateUI(
-                `Copied ${data.data.entities_copied} unchanged docs, generating ${data.data.entities_to_document} new`,
-                35
-            );
-        }
-    }
-    
-    async runDocGeneration() {
-        let offset = 0;
-        while (true) {
-            const data = await this.fetchJSON(
-                `/analysis/${this.snapshotId}/generate-docs-batch/`,
-                { method: 'POST', body: JSON.stringify({ offset, limit: this.docGenBatchSize }) }
-            );
-            if (!data.ok) throw new Error('Doc generation failed: ' + (data.data.error || 'Unknown error'));
-            const totalProcessed = offset + data.data.processed;
-            const totalEntities = totalProcessed + data.data.remaining;
-            const progress = 35 + ((totalProcessed / (totalEntities || 1)) * 55);
-            this.updateUI(
-                `Generating documentation (${totalProcessed}/${totalEntities})`,
-                Math.round(progress)
-            );
-            if (data.data.remaining === 0) break;
-            offset += data.data.processed;
-            await this.sleep(50);
-        }
-    }
-    
-    async runDriftDetection() {
-        this.updateUI('Detecting drift...', 90);
-        await this.fetchJSON(
-            `/analysis/${this.snapshotId}/detect-drift/`,
-            { method: 'POST' }
-        );
-        this.setStep(5, 'done');
-    }
-    
-    async fetchJSON(url, options = {}) {
-        const defaultOptions = {
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': this.getCookie('csrftoken'),
-            },
-        };
-        const response = await fetch(url, { ...defaultOptions, ...options });
-        const data = await response.json();
-        if (!response.ok) return { ok: false, data };
-        return { ok: true, data };
-    }
-    
-    updateUI(message, progress) {
-        document.getElementById('status-message').textContent = message;
-        document.getElementById('progress-bar').style.width = `${progress}%`;
-        document.getElementById('progress-text').textContent = `${Math.round(progress)}%`;
-    }
-    
-    showError(message) {
-        document.getElementById('error-container').classList.remove('hidden');
-        document.getElementById('error-message').textContent = message;
-        document.getElementById('status-message').textContent = 'Error occurred';
-    }
-    
-    sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-    
-    getCookie(name) {
-        const cookies = document.cookie.split(';');
-        for (let cookie of cookies) {
-            cookie = cookie.trim();
-            if (cookie.startsWith(name + '=')) {
-                return decodeURIComponent(cookie.substring(name.length + 1));
-            }
-        }
-        return '';
-    }
-}
-
-const orchestrator = new AnalysisOrchestrator({{ snapshot.id }}, '{{ snapshot.status }}');
-orchestrator.runFromStatus();
+};
 </script>
+{{ snapshot.error_message|json_script:'snapshot-error-message' }}
+<script src="{% static 'js/pages/status.js' %}" defer></script>
 {% endblock %}

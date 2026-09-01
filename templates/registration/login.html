@@ -1,63 +1,44 @@
 {% extends 'base.html' %}
 
-{% block title %}Login{% endblock %}
+{% block title %}Log in — DocGen{% endblock %}
 
 {% block content %}
-<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8">
-        <div>
-            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                Sign in to your account
-            </h2>
-            <p class="mt-2 text-center text-sm text-gray-600">
-                Or
-                <a href="{% url 'register' %}" class="font-medium text-blue-600 hover:text-blue-500">
-                    create a new account
-                </a>
-            </p>
-        </div>
-        
-        <form class="mt-8 space-y-6" method="post">
+<div class="auth-wrap">
+    <div class="auth-card">
+        <a href="{% url 'landing' %}" class="brand">
+            <span class="brand-mark">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 6 3 12 8 18"/><polyline points="16 6 21 12 16 18"/></svg>
+            </span>
+            DocGen
+        </a>
+        <h1 class="auth-title">Welcome back</h1>
+        <p class="auth-sub">Log in to your documentation workspace.</p>
+
+        {% if form.errors %}
+            <div class="error-banner" role="alert">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="flex-shrink:0;margin-top:2px;"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                <span>Your username and password didn't match. Please try again.</span>
+            </div>
+        {% endif %}
+
+        <form method="post" action="{% url 'login' %}">
             {% csrf_token %}
-            
-            {% if form.errors %}
-            <div class="rounded-md bg-red-50 p-4">
-                <div class="text-sm text-red-700">
-                    Invalid username or password. Please try again.
-                </div>
+            <div class="field">
+                <label class="label" for="id_username">Username</label>
+                <input type="text" name="username" id="id_username" class="input"
+                       autocomplete="username" autofocus required
+                       value="{{ form.username.value|default:'' }}">
             </div>
-            {% endif %}
-            
-            <div class="rounded-md shadow-sm -space-y-px">
-                <div>
-                    <label for="id_username" class="sr-only">Username</label>
-                    <input id="id_username" name="username" type="text" required 
-                        class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" 
-                        placeholder="Username">
-                </div>
-                <div>
-                    <label for="id_password" class="sr-only">Password</label>
-                    <input id="id_password" name="password" type="password" required 
-                        class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" 
-                        placeholder="Password">
-                </div>
+            <div class="field">
+                <label class="label" for="id_password">Password</label>
+                <input type="password" name="password" id="id_password" class="input"
+                       autocomplete="current-password" required>
             </div>
-
             <input type="hidden" name="next" value="{{ next }}">
-
-            <div>
-                <button type="submit" 
-                    class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    Sign in
-                </button>
-            </div>
+            <button type="submit" class="btn btn--primary">Log in</button>
         </form>
 
-        <div class="text-center">
-            <p class="text-sm text-gray-600">
-                Demo credentials: Create a superuser via <code class="bg-gray-100 px-2 py-1 rounded">python manage.py createsuperuser</code>
-            </p>
-        </div>
+        <p class="auth-alt">New to DocGen? <a href="{% url 'register' %}">Create an account</a></p>
     </div>
 </div>
 {% endblock %}

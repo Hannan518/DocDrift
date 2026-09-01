@@ -5,152 +5,109 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}DocGen{% endblock %}</title>
-    
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Diff2HTML CDN -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css" />
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html.min.js"></script>
-    
-    <!-- Highlight.js for code -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
-    
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
-    
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>">
-    
+
+    <script>
+    // Set theme before first paint to avoid a flash.
+    (function () {
+        var theme;
+        try { theme = localStorage.getItem('docgen-theme'); } catch (e) {}
+        if (theme !== 'light' && theme !== 'dark') {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', theme);
+    })();
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%236366f1'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='monospace' font-weight='bold'>%7B%7D</text></svg>">
+
     {% block extra_head %}{% endblock %}
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body data-nav="{% block nav_active %}{% endblock %}">
+
     <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex">
-                    <div class="flex-shrink-0 flex items-center">
-                        <a href="{% url 'repositories:list' %}" class="text-xl font-bold text-gray-900">
-                            DocGen
-                        </a>
-                    </div>
-                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-                        <a href="{% url 'repositories:list' %}" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            Repositories
-                        </a>
-                        <a href="{% url 'repositories:submit' %}" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            Submit
-                        </a>
-                    </div>
-                </div>
-                <div class="hidden sm:flex sm:items-center">
+    <nav class="nav">
+        <div class="container">
+            <div class="nav-inner">
+                <a href="{% url user.is_authenticated|yesno:'repositories:list,landing' %}" class="brand">
+                    <span class="brand-mark">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 6 3 12 8 18"/><polyline points="16 6 21 12 16 18"/></svg>
+                    </span>
+                    DocGen
+                </a>
+
+                <div class="nav-links">
                     {% if user.is_authenticated %}
-                        <span class="text-sm text-gray-700 mr-4">{{ user.username }}</span>
-                        <form method="post" action="{% url 'logout' %}" class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="text-sm text-gray-500 hover:text-gray-700 cursor-pointer bg-transparent border-none">Logout</button>
-                        </form>
-                    {% else %}
-                        <a href="{% url 'login' %}" class="text-sm text-gray-500 hover:text-gray-700">Login</a>
-                        <span class="text-gray-300 mx-2">|</span>
-                        <a href="{% url 'register' %}" class="text-sm text-blue-600 hover:text-blue-500">Register</a>
+                        <a href="{% url 'repositories:list' %}" class="nav-link" data-nav-link="repositories">Repositories</a>
+                        <a href="{% url 'repositories:submit' %}" class="nav-link" data-nav-link="submit">New analysis</a>
                     {% endif %}
                 </div>
-                
-                <!-- Mobile menu button -->
-                <div class="flex items-center sm:hidden">
-                    <button id="mobile-menu-btn" class="text-gray-500 hover:text-gray-700 p-2">
-                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                        </svg>
+
+                <div class="nav-side">
+                    <button id="theme-toggle" class="icon-btn" type="button" aria-label="Toggle theme">
+                        <svg class="icon-sun hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                        <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+                    </button>
+
+                    {% if user.is_authenticated %}
+                        <span class="nav-user">{{ user.username }}</span>
+                        <form method="post" action="{% url 'logout' %}" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn--ghost btn--sm">Log out</button>
+                        </form>
+                    {% else %}
+                        <span class="nav-auth-links">
+                            <a href="{% url 'login' %}" class="btn btn--ghost btn--sm">Log in</a>
+                            <a href="{% url 'register' %}" class="btn btn--primary btn--sm">Get started</a>
+                        </span>
+                    {% endif %}
+
+                    <button id="mobile-menu-btn" class="icon-btn nav-burger" type="button" aria-label="Open menu">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
                     </button>
                 </div>
             </div>
-            
-            <!-- Mobile menu -->
-            <div id="mobile-menu" class="hidden sm:hidden pb-4">
-                <div class="space-y-1">
-                    <a href="{% url 'repositories:list' %}" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">Repositories</a>
-                    <a href="{% url 'repositories:submit' %}" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">Submit</a>
-                    {% if user.is_authenticated %}
-                        <div class="border-t border-gray-200 mt-2 pt-2">
-                            <span class="block px-3 py-2 text-sm text-gray-500">{{ user.username }}</span>
-                            <form method="post" action="{% url 'logout' %}">
-                                {% csrf_token %}
-                                <button type="submit" class="block w-full text-left px-3 py-2 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">Logout</button>
-                            </form>
-                        </div>
-                    {% else %}
-                        <div class="border-t border-gray-200 mt-2 pt-2">
-                            <a href="{% url 'login' %}" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">Login</a>
-                            <a href="{% url 'register' %}" class="block px-3 py-2 text-base font-medium text-blue-600 hover:text-blue-700 hover:bg-gray-50">Register</a>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
+        </div>
+
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="mobile-menu">
+            {% if user.is_authenticated %}
+                <a href="{% url 'repositories:list' %}" data-nav-link="repositories">Repositories</a>
+                <a href="{% url 'repositories:submit' %}" data-nav-link="submit">New analysis</a>
+                <div class="mm-divider"></div>
+                <span class="nav-user" style="padding: 11px 12px; display:block;">{{ user.username }}</span>
+                <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit">Log out</button>
+                </form>
+            {% else %}
+                <a href="{% url 'login' %}">Log in</a>
+                <a href="{% url 'register' %}">Get started</a>
+            {% endif %}
         </div>
     </nav>
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <!-- CSRF token available to any page-level JS -->
+    <div hidden>{% csrf_token %}</div>
+
+    <main>
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Footer -->
-    <footer class="bg-white border-t border-gray-200 mt-12">
-        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            <p class="text-center text-sm text-gray-500">
-                DocGen — CS50W Capstone Project — Auto-documentation with drift detection
-            </p>
+    <footer class="footer">
+        <div class="container">
+            <span>DocGen &mdash; auto-generated docs with drift detection</span>
+            <span>CS50W Capstone Project</span>
         </div>
     </footer>
 
-    <!-- Toast container -->
-    <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+    <!-- Toasts -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
-    <script>
-    // Mobile menu toggle
-    document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
-        document.getElementById('mobile-menu').classList.toggle('hidden');
-    });
-    
-    // Toast notifications
-    function showToast(message, type = 'success') {
-        const container = document.getElementById('toast-container');
-        const toast = document.createElement('div');
-        const colors = {
-            success: 'bg-green-500',
-            error: 'bg-red-500',
-            info: 'bg-blue-500',
-            warning: 'bg-yellow-500'
-        };
-        toast.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-lg shadow-lg text-sm flex items-center justify-between min-w-[250px]`;
-        toast.innerHTML = `<span>${message}</span><button onclick="this.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">&times;</button>`;
-        container.appendChild(toast);
-        setTimeout(() => toast.remove(), 5000);
-    }
-    
-    // Loading spinner
-    function showLoading(message = 'Loading...') {
-        const overlay = document.createElement('div');
-        overlay.id = 'loading-overlay';
-        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-        overlay.innerHTML = `<div class="bg-white rounded-lg p-6 flex items-center space-x-4 shadow-xl"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div><span class="text-gray-700">${message}</span></div>`;
-        document.body.appendChild(overlay);
-    }
-    
-    function hideLoading() {
-        document.getElementById('loading-overlay')?.remove();
-    }
-    
-    // Auto-highlight code blocks
-    document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('pre code').forEach(block => hljs.highlightBlock(block));
-    });
-    </script>
-
-    {% block extra_scripts %}{% endblock %}
+    <script src="{% static 'js/app.js' %}" defer></script>
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

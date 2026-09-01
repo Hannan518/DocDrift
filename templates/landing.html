@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block title %}DocGen — Documentation that keeps up with your code{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <section class="hero">
+        <span class="hero__badge">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
+            CS50W Capstone Project
+        </span>
+        <h1>Documentation that <span class="grad">keeps up</span> with your code.</h1>
+        <p class="hero__sub">Point DocGen at a GitHub repository. It parses every function and class,
+            writes docstrings with an LLM, and flags the exact places your docs drifted out of date
+            the moment your code changes.</p>
+        <div class="hero__cta">
+            <a href="{% url 'register' %}" class="btn btn--primary">
+                Analyze a repository
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </a>
+            <a href="#how" class="btn btn--secondary">See how it works</a>
+        </div>
+
+        <div class="hero-demo" aria-hidden="true">
+            <div class="hero-demo__bar"><i></i><i></i><i></i><span class="title">drift-dashboard</span></div>
+            <div class="hero-demo__body">
+<span class="c">// docgen detects what your docs won't tell you</span><br>
+<span class="doc">"""Fetch user profile from the API."""</span>  <span class="c">← written 3 commits ago</span><br>
+<span class="k">def</span> <span class="f">fetch_profile</span>(user_id: <span class="s">str</span>, include_history: <span class="s">bool</span> = <span class="s">False</span>):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c">...</span><br>
+<br>
+<span class="doc">⚠ stale_doc</span>&nbsp;&nbsp;<span class="s">fetch_profile</span> — body changed, doc regenerated<br>
+<span class="doc">⚠ signature_changed</span>&nbsp;&nbsp;+ include_history: bool added<br>
+<span class="doc">✓ 38 entities documented · 0 orphaned</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="landing-section" id="how">
+        <div class="landing-section__head">
+            <h2>Three steps, fully automatic</h2>
+            <p>From a repository URL to a documented, drift-monitored codebase.</p>
+        </div>
+        <div class="steps-grid">
+            <div class="card step-card">
+                <div class="step-card__num">1</div>
+                <h3>Connect a repository</h3>
+                <p>Paste a public GitHub URL. DocGen shallow-clones it and maps every module,
+                    class, and public function with Python's AST.</p>
+            </div>
+            <div class="card step-card">
+                <div class="step-card__num">2</div>
+                <h3>Generate documentation</h3>
+                <p>An LLM writes a Google-style docstring for each entity. Unchanged code
+                    keeps its docs on re-runs — you only pay for what changed.</p>
+            </div>
+            <div class="card step-card">
+                <div class="step-card__num">3</div>
+                <h3>Detect drift</h3>
+                <p>Re-analyze anytime. DocGen compares snapshots and flags stale docs,
+                    signature changes, new undocumented code, and orphaned docs.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="landing-section">
+        <div class="landing-section__head">
+            <h2>Everything you need to keep docs honest</h2>
+        </div>
+        <div class="features-grid">
+            <div class="card feature-card">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M6 16V9M10 16V4M14 16v-7M18 16v-4"/></svg>
+                <h3>Snapshot history</h3>
+                <p>Every analysis is a snapshot. Browse any version of your codebase's
+                    documentation and see how it evolved.</p>
+            </div>
+            <div class="card feature-card">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 17V9h6M9 13h5"/></svg>
+                <h3>AST-accurate</h3>
+                <p>No regex guesswork — real Python parsing with signatures, source hashes,
+                    and class-method relationships.</p>
+            </div>
+            <div class="card feature-card">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+                <h3>Token-efficient re-runs</h3>
+                <p>Hash-based change detection means re-analysis only regenerates docs for
+                    code that actually changed.</p>
+            </div>
+            <div class="card feature-card">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M21 3l-7 7M8 21H3v-5M3 21l7-7"/></svg>
+                <h3>Real diffs</h3>
+                <p>Every drift flag includes a unified diff of the source change, rendered
+                    line by line inside the dashboard.</p>
+            </div>
+            <div class="card feature-card">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>
+                <h3>Fast & parallel</h3>
+                <p>Batched pipeline with parallel doc generation and live progress —
+                    resumable, so closing a tab doesn't lose work.</p>
+            </div>
+            <div class="card feature-card">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8.5 12.5 2.5 2.5 5-6"/></svg>
+                <h3>Works everywhere</h3>
+                <p>A clean responsive interface with light and dark themes — check drift
+                    from your phone as easily as your desktop.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="landing-cta">
+        <h2>Stop trusting stale docs.</h2>
+        <p>Create an account and analyze your first repository in under a minute.</p>
+        <a href="{% url 'register' %}" class="btn btn--primary">Get started — it's free</a>
+    </section>
+
+</div>
+{% endblock %}

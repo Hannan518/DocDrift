@@ -1,128 +1,141 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}{{ repository.name }}{% endblock %}
+{% block title %}{{ repository.name }} — DocGen{% endblock %}
+{% block nav_active %}repositories{% endblock %}
 
 {% block content %}
-<div class="px-4 sm:px-0">
-    <div class="mb-6">
-        <a href="{% url 'repositories:list' %}" class="text-sm text-blue-600 hover:text-blue-500">&larr; Back to Repositories</a>
-    </div>
-
-    <div class="bg-white shadow sm:rounded-lg mb-6">
-        <div class="px-4 py-5 sm:p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h1 class="text-3xl font-bold text-gray-900">{{ repository.name }}</h1>
-                <div class="flex space-x-3">
-                    <button onclick="reanalyzeRepo({{ repository.id }})"
-                            class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
-                        Re-analyze
-                    </button>
-                    <button onclick="if(confirm('Delete {{ repository.name }}? This cannot be undone.')) deleteRepo({{ repository.id }})"
-                            class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700">
-                        Delete
-                    </button>
-                </div>
-            </div>
-            
-            <div class="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                <div><span class="font-medium">Source:</span> {{ repository.source_type|title }}</div>
-                <div><span class="font-medium">Created:</span> {{ repository.created_at|date:"Y-m-d H:i" }}</div>
-                {% if repository.github_url %}
-                <div class="col-span-2">
-                    <span class="font-medium">URL:</span>
-                    <a href="{{ repository.github_url }}" target="_blank" class="text-indigo-600 hover:text-indigo-500">{{ repository.github_url }}</a>
-                </div>
-                {% endif %}
-            </div>
+<div class="container">
+    <div class="page-header">
+        <div>
+            <div class="eyebrow"><a href="{% url 'repositories:list' %}">&larr; Repositories</a></div>
+            <h1>{{ repository.name }}</h1>
+            <p class="sub">
+                Added {{ repository.created_at|date:'M j, Y' }} ·
+                <span class="mono">{{ repository.github_url|cut:'https://github.com/' }}</span>
+            </p>
+        </div>
+        <div class="page-actions">
+            <button type="button" class="btn btn--primary" data-action="reanalyze"
+                    data-url="{% url 'repositories:reanalyze' repository.id %}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
+                Re-analyze
+            </button>
+            <button type="button" class="btn btn--danger" data-action="delete"
+                    data-url="{% url 'repositories:delete' repository.id %}"
+                    data-name="{{ repository.name|escapejs }}">
+                Delete
+            </button>
         </div>
     </div>
 
-    <div class="bg-white shadow sm:rounded-lg">
-        <div class="px-4 py-5 sm:p-6">
-            <h2 class="text-xl font-semibold text-gray-900 mb-4">Snapshots</h2>
+    <div class="stat-grid" style="margin-bottom: 20px;">
+        <div class="stat">
+            <div class="stat__label">Analyses</div>
+            <div class="stat__value">{{ snapshots|length }}{% if snapshots|length == 10 %}+{% endif %}</div>
+        </div>
+        {% with latest=snapshots.0 %}
+        <div class="stat">
+            <div class="stat__label">Entities documented</div>
+            <div class="stat__value">{{ latest.entities_documented|default:0 }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat__label">Latest drift flags</div>
+            <div class="stat__value {% if latest.drift_count and latest.drift_count > 0 %}stat__value--drift{% else %}stat__value--ok{% endif %}">
+                {{ latest.drift_count|default:0 }}
+            </div>
+        </div>
+        <div class="stat">
+            <div class="stat__label">Latest status</div>
+            <div class="stat__value">
+                {% if latest.status == 'complete' %}Complete
+                {% elif latest.status == 'failed' %}Failed
+                {% elif latest %}In progress
+                {% else %}—{% endif %}
+            </div>
+        </div>
+        {% endwith %}
+    </div>
 
-            {% if snapshots %}
-            <div class="overflow-hidden border border-gray-200 rounded-lg">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+    <h2 style="margin-bottom: 12px;">Snapshots</h2>
+
+    {% if snapshots %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Snapshot</th>
+                        <th>Status</th>
+                        <th>Files</th>
+                        <th>Entities</th>
+                        <th>Documented</th>
+                        <th>Drift</th>
+                        <th>Commit</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for snapshot in snapshots %}
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entities</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Documented</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {% for snapshot in snapshots %}
-                        <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ snapshot.timestamp|date:"Y-m-d H:i:s" }}
+                            <td>
+                                <span class="muted">#{{ snapshot.id }}</span>
+                                <span class="small muted"> · {{ snapshot.timestamp|date:'M j, H:i' }}</span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td>
                                 {% if snapshot.status == 'complete' %}
-                                <span class="px-2 inline-flex text-xs font-semibold rounded-full bg-green-100 text-green-800">Complete</span>
+                                    <span class="pill pill--green"><span class="dot"></span>Complete</span>
                                 {% elif snapshot.status == 'failed' %}
-                                <span class="px-2 inline-flex text-xs font-semibold rounded-full bg-red-100 text-red-800">Failed</span>
-                                {% elif snapshot.status == 'pending' %}
-                                <span class="px-2 inline-flex text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Pending</span>
+                                    <span class="pill pill--red"><span class="dot"></span>Failed</span>
                                 {% else %}
-                                <span class="px-2 inline-flex text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">{{ snapshot.get_status_display }}</span>
+                                    <span class="pill pill--amber"><span class="dot"></span>In progress</span>
                                 {% endif %}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ snapshot.total_entities }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ snapshot.entities_documented }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                            <td>{{ snapshot.total_files }}</td>
+                            <td>{{ snapshot.total_entities }}</td>
+                            <td>{{ snapshot.entities_documented }}</td>
+                            <td>
+                                {% if snapshot.drift_count %}
+                                    <span class="pill pill--red">{{ snapshot.drift_count }}</span>
+                                {% elif snapshot.status == 'complete' %}
+                                    <span class="pill pill--green">0</span>
+                                {% else %}
+                                    <span class="faint">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if snapshot.commit_hash %}
+                                    <span class="mono muted" title="{{ snapshot.commit_hash }}">{{ snapshot.commit_hash|slice:":7" }}</span>
+                                {% else %}
+                                    <span class="faint">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
                                 {% if snapshot.status == 'complete' %}
-                                <a href="{% url 'analysis:browser' snapshot.id %}" class="text-indigo-600 hover:text-indigo-900">Browse</a>
-                                <a href="{% url 'analysis:drift' snapshot.id %}" class="text-indigo-600 hover:text-indigo-900">Drift</a>
-                                {% elif snapshot.status == 'pending' %}
-                                <button onclick="window.location.href='/analysis/{{ snapshot.id }}/status/'" class="text-green-600 hover:text-green-900">Start</button>
+                                    <a href="{% url 'analysis:browser' snapshot.id %}" class="btn btn--secondary btn--sm">Docs</a>
+                                    <a href="{% url 'analysis:drift' snapshot.id %}" class="btn btn--ghost btn--sm">Drift</a>
+                                {% elif snapshot.status == 'failed' %}
+                                    <a href="{% url 'analysis:status' snapshot.id %}" class="btn btn--secondary btn--sm">Error</a>
+                                {% else %}
+                                    <a href="{% url 'analysis:status' snapshot.id %}" class="btn btn--secondary btn--sm">Resume</a>
                                 {% endif %}
                             </td>
                         </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <div class="text-center py-8 text-gray-500">
-                <div class="text-4xl mb-4">📊</div>
-                <p>No snapshots yet. Start your first analysis!</p>
-            </div>
-            {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-    </div>
+    {% else %}
+        <div class="empty">
+            <div class="empty__icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            </div>
+            <h3>No analyses yet</h3>
+            <p>Run your first analysis to generate documentation for this repository.</p>
+        </div>
+    {% endif %}
 </div>
+{% endblock %}
 
-<script>
-function getCSRFToken() {
-    const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
-        cookie = cookie.trim();
-        if (cookie.startsWith('csrftoken=')) {
-            return cookie.substring('csrftoken='.length);
-        }
-    }
-    return '';
-}
-
-async function reanalyzeRepo(repoId) {
-    const response = await fetch(`/repositories/${repoId}/reanalyze/`, {
-        method: 'POST',
-        headers: { 'X-CSRFToken': getCSRFToken(), 'Content-Type': 'application/json' }
-    });
-    const data = await response.json();
-    if (response.ok) window.location.href = `/analysis/${data.snapshot_id}/status/`;
-}
-
-async function deleteRepo(repoId) {
-    const response = await fetch(`/repositories/${repoId}/delete/`, {
-        method: 'POST',
-        headers: { 'X-CSRFToken': getCSRFToken(), 'Content-Type': 'application/json' }
-    });
-    if (response.ok) window.location.href = '/repositories/';
-}
-</script>
+{% block extra_js %}
+<script src="{% static 'js/pages/detail.js' %}" defer></script>
 {% endblock %}
