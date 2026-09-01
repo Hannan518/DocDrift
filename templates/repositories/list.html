@@ -16,40 +16,68 @@
         <div class="bg-white shadow overflow-hidden sm:rounded-md">
             <ul class="divide-y divide-gray-200">
                 {% for repo in repositories %}
+                {% with latest=repo.snapshots.first %}
                 <li>
-                    <a href="{% url 'repositories:detail' repo.id %}" class="block hover:bg-gray-50">
-                        <div class="px-4 py-4 sm:px-6">
-                            <div class="flex items-center justify-between">
-                                <p class="text-sm font-medium text-blue-600 truncate">
-                                    {{ repo.name }}
-                                </p>
-                                <div class="ml-2 flex-shrink-0 flex">
-                                    <p class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                        {{ repo.source_type }}
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="mt-2 sm:flex sm:justify-between">
-                                <div class="sm:flex">
-                                    <p class="flex items-center text-sm text-gray-500">
-                                        {{ repo.snapshots.count }} snapshot{{ repo.snapshots.count|pluralize }}
-                                    </p>
-                                </div>
-                                <div class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                                    <p>
-                                        Created {{ repo.created_at|timesince }} ago
-                                    </p>
-                                </div>
+                    <div class="px-4 py-4 sm:px-6">
+                        <div class="flex items-center justify-between">
+                            <a href="{% url 'repositories:detail' repo.id %}" class="text-sm font-medium text-blue-600 hover:text-blue-800 truncate">
+                                {{ repo.name }}
+                            </a>
+                            <div class="ml-2 flex items-center space-x-2">
+                                {% if latest %}
+                                    {% if latest.status == 'complete' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Complete</span>
+                                    {% elif latest.status == 'failed' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Failed</span>
+                                    {% elif latest.status == 'pending' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-600">Pending</span>
+                                    {% else %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">{{ latest.get_status_display }}</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-600">No analysis</span>
+                                {% endif %}
+                                <button onclick="if(confirm('Delete {{ repo.name }}? This cannot be undone.')) deleteRepo({{ repo.id }})"
+                                        class="text-xs text-red-500 hover:text-red-700 underline">
+                                    Delete
+                                </button>
                             </div>
                         </div>
-                    </a>
+                        <div class="mt-2 sm:flex sm:justify-between">
+                            <div class="sm:flex items-center space-x-4">
+                                <p class="text-sm text-gray-500">
+                                    {{ repo.snapshots.count }} snapshot{{ repo.snapshots.count|pluralize }}
+                                </p>
+                                {% if latest.total_entities > 0 %}
+                                <p class="text-sm text-gray-500">
+                                    {{ latest.total_entities }} entities
+                                </p>
+                                {% endif %}
+                                {% if latest.entities_documented > 0 %}
+                                <p class="text-sm text-gray-500">
+                                    {{ latest.entities_documented }} documented
+                                </p>
+                                {% endif %}
+                            </div>
+                            <div class="mt-2 flex items-center space-x-3 text-sm text-gray-500 sm:mt-0">
+                                <span>Created {{ repo.created_at|timesince }} ago</span>
+                                {% if latest and latest.status == 'complete' %}
+                                <a href="{% url 'analysis:browser' latest.id %}" class="text-blue-600 hover:text-blue-800">Browse</a>
+                                <a href="{% url 'analysis:drift' latest.id %}" class="text-blue-600 hover:text-blue-800">Drift</a>
+                                {% endif %}
+                                <button onclick="reanalyzeRepo({{ repo.id }})" class="text-green-600 hover:text-green-800">Re-analyze</button>
+                            </div>
+                        </div>
+                    </div>
                 </li>
+                {% endwith %}
                 {% endfor %}
             </ul>
         </div>
     {% else %}
         <div class="bg-white shadow sm:rounded-lg">
             <div class="px-4 py-5 sm:p-6 text-center">
+                <div class="text-6xl mb-4">📂</div>
                 <h3 class="text-lg font-medium text-gray-900 mb-2">No repositories yet</h3>
                 <p class="text-sm text-gray-500 mb-4">Get started by submitting your first repository for analysis.</p>
                 <a href="{% url 'repositories:submit' %}" 
@@ -60,4 +88,46 @@
         </div>
     {% endif %}
 </div>
+
+<script>
+function getCSRFToken() {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        cookie = cookie.trim();
+        if (cookie.startsWith('csrftoken=')) {
+            return cookie.substring('csrftoken='.length);
+        }
+    }
+    return '';
+}
+
+async function deleteRepo(repoId) {
+    const response = await fetch(`/repositories/${repoId}/delete/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'Content-Type': 'application/json'
+        }
+    });
+    if (response.ok) {
+        window.location.reload();
+    }
+}
+
+async function reanalyzeRepo(repoId) {
+    const response = await fetch(`/repositories/${repoId}/reanalyze/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'Content-Type': 'application/json'
+        }
+    });
+    const data = await response.json();
+    if (response.ok) {
+        window.location.href = `/analysis/${data.snapshot_id}/status/`;
+    } else {
+        alert(data.error || 'Failed to start re-analysis');
+    }
+}
+</script>
 {% endblock %}

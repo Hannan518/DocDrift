@@ -20,7 +20,6 @@ class Repository(models.Model):
     
     class Meta:
         ordering = ['-created_at']
-        unique_together = [['owner', 'name']]
         indexes = [
             models.Index(fields=['owner', '-created_at']),
         ]
