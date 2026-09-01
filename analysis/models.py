@@ -7,6 +7,7 @@ class Snapshot(models.Model):
     
     STATUS_CHOICES = [
         ('pending', 'Pending'),
+        ('ready_to_parse', 'Ready to Parse'),
         ('parsing', 'Parsing Code'),
         ('parsing_complete', 'Parsing Complete'),
         ('generating_docs', 'Generating Documentation'),

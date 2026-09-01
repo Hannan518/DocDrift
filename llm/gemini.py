@@ -3,7 +3,7 @@ import logging
 from typing import Optional
 
 from .base import BaseLLMProvider
-from .prompts import build_docstring_prompt, build_class_prompt, build_function_prompt
+from .prompts import build_docstring_prompt, build_class_prompt, build_function_prompt, build_module_prompt
 
 logger = logging.getLogger(__name__)
 
