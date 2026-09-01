@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Codebase Documentation Generator{% endblock %}</title>
+    <title>{% block title %}DocGen{% endblock %}</title>
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,8 +13,15 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css" />
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html.min.js"></script>
     
+    <!-- Highlight.js for code -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>">
     
     {% block extra_head %}{% endblock %}
 </head>
@@ -38,7 +45,7 @@
                         </a>
                     </div>
                 </div>
-                <div class="flex items-center">
+                <div class="hidden sm:flex sm:items-center">
                     {% if user.is_authenticated %}
                         <span class="text-sm text-gray-700 mr-4">{{ user.username }}</span>
                         <form method="post" action="{% url 'logout' %}" class="inline">
@@ -47,6 +54,39 @@
                         </form>
                     {% else %}
                         <a href="{% url 'login' %}" class="text-sm text-gray-500 hover:text-gray-700">Login</a>
+                        <span class="text-gray-300 mx-2">|</span>
+                        <a href="{% url 'register' %}" class="text-sm text-blue-600 hover:text-blue-500">Register</a>
+                    {% endif %}
+                </div>
+                
+                <!-- Mobile menu button -->
+                <div class="flex items-center sm:hidden">
+                    <button id="mobile-menu-btn" class="text-gray-500 hover:text-gray-700 p-2">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Mobile menu -->
+            <div id="mobile-menu" class="hidden sm:hidden pb-4">
+                <div class="space-y-1">
+                    <a href="{% url 'repositories:list' %}" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">Repositories</a>
+                    <a href="{% url 'repositories:submit' %}" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">Submit</a>
+                    {% if user.is_authenticated %}
+                        <div class="border-t border-gray-200 mt-2 pt-2">
+                            <span class="block px-3 py-2 text-sm text-gray-500">{{ user.username }}</span>
+                            <form method="post" action="{% url 'logout' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="block w-full text-left px-3 py-2 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">Logout</button>
+                            </form>
+                        </div>
+                    {% else %}
+                        <div class="border-t border-gray-200 mt-2 pt-2">
+                            <a href="{% url 'login' %}" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">Login</a>
+                            <a href="{% url 'register' %}" class="block px-3 py-2 text-base font-medium text-blue-600 hover:text-blue-700 hover:bg-gray-50">Register</a>
+                        </div>
                     {% endif %}
                 </div>
             </div>
@@ -62,10 +102,54 @@
     <footer class="bg-white border-t border-gray-200 mt-12">
         <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
             <p class="text-center text-sm text-gray-500">
-                CS50W Capstone Project - Codebase Documentation Generator
+                DocGen — CS50W Capstone Project — Auto-documentation with drift detection
             </p>
         </div>
     </footer>
+
+    <!-- Toast container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+    <script>
+    // Mobile menu toggle
+    document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
+        document.getElementById('mobile-menu').classList.toggle('hidden');
+    });
+    
+    // Toast notifications
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        const colors = {
+            success: 'bg-green-500',
+            error: 'bg-red-500',
+            info: 'bg-blue-500',
+            warning: 'bg-yellow-500'
+        };
+        toast.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-lg shadow-lg text-sm flex items-center justify-between min-w-[250px]`;
+        toast.innerHTML = `<span>${message}</span><button onclick="this.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">&times;</button>`;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+    }
+    
+    // Loading spinner
+    function showLoading(message = 'Loading...') {
+        const overlay = document.createElement('div');
+        overlay.id = 'loading-overlay';
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        overlay.innerHTML = `<div class="bg-white rounded-lg p-6 flex items-center space-x-4 shadow-xl"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div><span class="text-gray-700">${message}</span></div>`;
+        document.body.appendChild(overlay);
+    }
+    
+    function hideLoading() {
+        document.getElementById('loading-overlay')?.remove();
+    }
+    
+    // Auto-highlight code blocks
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('pre code').forEach(block => hljs.highlightBlock(block));
+    });
+    </script>
 
     {% block extra_scripts %}{% endblock %}
 </body>

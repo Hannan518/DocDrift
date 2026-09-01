@@ -1,46 +1,78 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Documentation Browser{% endblock %}
+{% block title %}Documentation Browser — {{ snapshot.repository.name }}{% endblock %}
 
 {% block content %}
 <div class="px-4 sm:px-0">
-    <h1 class="text-3xl font-bold text-gray-900 mb-8">Documentation Browser</h1>
+    <div class="mb-6">
+        <a href="{% url 'repositories:list' %}" class="text-sm text-blue-600 hover:text-blue-500">&larr; Back to Repositories</a>
+    </div>
+    
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">{{ snapshot.repository.name }}</h1>
+            <p class="text-sm text-gray-500 mt-1">{{ snapshot.total_entities }} entities documented</p>
+        </div>
+        <div class="flex space-x-3">
+            <a href="{% url 'analysis:drift' snapshot.id %}" 
+               class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                Drift Dashboard
+            </a>
+            <button onclick="reanalyzeRepo({{ snapshot.repository.id }})"
+                    class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
+                Re-analyze
+            </button>
+        </div>
+    </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Left: Tree View -->
         <div class="lg:col-span-1">
             <div class="bg-white shadow sm:rounded-lg sticky top-6">
                 <div class="px-4 py-5 sm:p-6">
-                    <h2 class="text-lg font-medium text-gray-900 mb-4">Module Tree</h2>
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-medium text-gray-900">Modules</h2>
+                        <span class="text-xs text-gray-500">{{ snapshot.total_entities }} items</span>
+                    </div>
                     
-                    <div id="tree-container" class="text-sm">
+                    <!-- Search -->
+                    <div class="mb-4">
+                        <input type="text" id="tree-search" placeholder="Search entities..."
+                               class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                               oninput="filterTree(this.value)">
+                    </div>
+                    
+                    <div id="tree-container" class="text-sm max-h-[60vh] overflow-y-auto">
                         {% regroup snapshot.entities.all by file_path as file_list %}
                         {% for file in file_list %}
-                        <div class="tree-node font-medium text-gray-900 py-1" onclick="toggleNode(this)">
-                            {{ file.grouper|cut:"/" }}
-                        </div>
-                        <div class="tree-children">
-                            {% for entity in file.list %}
-                            {% if entity.entity_type == 'class' %}
-                            <div class="tree-node text-blue-700 py-1" onclick="toggleNode(this)">
-                                {{ entity.name }}
+                        <div class="tree-file" data-file="{{ file.grouper }}">
+                            <div class="tree-node font-medium text-gray-900 py-1 cursor-pointer hover:bg-gray-50 rounded" onclick="toggleNode(this)">
+                                <span class="text-gray-400 mr-1">▸</span> {{ file.grouper|cut:"/" }}
                             </div>
-                            <div class="tree-children">
-                                {% for child in entity.children.all %}
-                                <div class="entity-function pl-2 py-1 cursor-pointer hover:bg-gray-50" 
-                                     onclick="showEntity({{ entity.id }}, '{{ child.qualified_name|escapejs }}', '{{ child.signature|escapejs }}', '{{ child.file_path|escapejs }}', {{ child.line_number }}, '{{ child.existing_docstring|escapejs }}', '{{ child.generated_docstring|escapejs }}')">
-                                    <span class="text-green-600">fn</span> {{ child.name }}
+                            <div class="tree-children hidden pl-4">
+                                {% for entity in file.list %}
+                                {% if entity.entity_type == 'class' %}
+                                <div class="tree-entity tree-node text-blue-700 py-1 cursor-pointer hover:bg-blue-50 rounded" 
+                                     data-name="{{ entity.name|lower }}" onclick="toggleNode(this)">
+                                    <span class="text-gray-400 mr-1">▸</span> <span class="text-blue-600">class</span> {{ entity.name }}
                                 </div>
+                                <div class="tree-children hidden pl-4">
+                                    {% for child in entity.children.all %}
+                                    <div class="tree-entity pl-2 py-1 cursor-pointer hover:bg-green-50 rounded text-sm"
+                                         data-name="{{ child.name|lower }}" onclick="showEntity({{ child.id }}, '{{ child.qualified_name|escapejs }}', '{{ child.signature|escapejs }}', '{{ child.file_path|escapejs }}', {{ child.line_number }}, '{{ child.existing_docstring|escapejs }}', '{{ child.generated_docstring|escapejs }}')">
+                                        <span class="text-green-600 font-mono">fn</span> {{ child.name }}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% elif entity.entity_type == 'function' and not entity.parent %}
+                                <div class="tree-entity pl-2 py-1 cursor-pointer hover:bg-green-50 rounded text-sm"
+                                     data-name="{{ entity.name|lower }}" onclick="showEntity({{ entity.id }}, '{{ entity.qualified_name|escapejs }}', '{{ entity.signature|escapejs }}', '{{ entity.file_path|escapejs }}', {{ entity.line_number }}, '{{ entity.existing_docstring|escapejs }}', '{{ entity.generated_docstring|escapejs }}')">
+                                    <span class="text-green-600 font-mono">fn</span> {{ entity.name }}
+                                </div>
+                                {% endif %}
                                 {% endfor %}
                             </div>
-                            {% elif entity.entity_type == 'function' and not entity.parent %}
-                            <div class="entity-function pl-2 py-1 cursor-pointer hover:bg-gray-50"
-                                 onclick="showEntity({{ entity.id }}, '{{ entity.qualified_name|escapejs }}', '{{ entity.signature|escapejs }}', '{{ entity.file_path|escapejs }}', {{ entity.line_number }}, '{{ entity.existing_docstring|escapejs }}', '{{ entity.generated_docstring|escapejs }}')">
-                                <span class="text-green-600">fn</span> {{ entity.name }}
-                            </div>
-                            {% endif %}
-                            {% endfor %}
                         </div>
                         {% endfor %}
                     </div>
@@ -55,54 +87,39 @@
                     <div id="entity-detail" class="hidden">
                         <h2 id="entity-name" class="text-xl font-bold text-gray-900 mb-2"></h2>
                         
-                        <div class="mb-4">
+                        <div class="mb-4 flex flex-wrap gap-4">
                             <p class="text-sm text-gray-600">
-                                <span class="font-medium">Location:</span> 
-                                <span id="entity-location"></span>
+                                <span class="font-medium">Location:</span> <span id="entity-location" class="font-mono text-xs"></span>
                             </p>
                             <p class="text-sm text-gray-600">
-                                <span class="font-medium">Line:</span> 
-                                <span id="entity-line"></span>
+                                <span class="font-medium">Line:</span> <span id="entity-line"></span>
                             </p>
                         </div>
                         
                         <div class="mb-4">
                             <h3 class="text-sm font-medium text-gray-900 mb-2">Signature</h3>
-                            <code id="entity-signature" class="block bg-gray-50 p-3 rounded text-sm text-gray-800"></code>
+                            <pre id="entity-signature" class="bg-gray-900 text-green-400 p-3 rounded text-sm overflow-x-auto font-mono"></pre>
                         </div>
                         
                         <div class="mb-4">
                             <h3 class="text-sm font-medium text-gray-900 mb-2">Existing Docstring</h3>
-                            <p id="entity-existing-doc" class="bg-gray-50 p-3 rounded text-sm text-gray-700 whitespace-pre-wrap">None</p>
+                            <div id="entity-existing-doc" class="bg-gray-50 border border-gray-200 p-3 rounded text-sm text-gray-700 whitespace-pre-wrap italic">None</div>
                         </div>
                         
                         <div class="mb-4">
                             <h3 class="text-sm font-medium text-gray-900 mb-2">Generated Documentation</h3>
-                            <p id="entity-generated-doc" class="bg-blue-50 p-3 rounded text-sm text-gray-700 whitespace-pre-wrap">None</p>
+                            <div id="entity-generated-doc" class="bg-blue-50 border border-blue-200 p-3 rounded text-sm text-gray-700 whitespace-pre-wrap"></div>
                         </div>
                     </div>
                     
-                    <div id="entity-placeholder" class="text-center py-12 text-gray-500">
-                        <p class="text-lg">Select an entity from the tree to view details</p>
+                    <div id="entity-placeholder" class="text-center py-16 text-gray-400">
+                        <div class="text-5xl mb-4">👈</div>
+                        <p class="text-lg">Select an entity from the tree</p>
+                        <p class="text-sm mt-1">to view its documentation</p>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="mt-6 flex space-x-4">
-        <a href="{% url 'analysis:drift' snapshot.id %}" 
-           class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-            View Drift Dashboard
-        </a>
-        <button onclick="reanalyzeRepo({{ snapshot.repository.id }})"
-                class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
-            Re-analyze
-        </button>
-        <a href="{% url 'repositories:list' %}" 
-           class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-            Back to Repositories
-        </a>
     </div>
 </div>
 
@@ -121,9 +138,35 @@ function getCSRFToken() {
 function toggleNode(node) {
     const children = node.nextElementSibling;
     if (children && children.classList.contains('tree-children')) {
-        children.classList.toggle('visible');
-        node.classList.toggle('expanded');
+        children.classList.toggle('hidden');
+        const arrow = node.querySelector('span:first-child');
+        if (arrow) arrow.textContent = children.classList.contains('hidden') ? '▸' : '▾';
     }
+}
+
+function filterTree(query) {
+    query = query.toLowerCase();
+    document.querySelectorAll('.tree-file').forEach(file => {
+        let hasMatch = false;
+        file.querySelectorAll('.tree-entity').forEach(entity => {
+            const name = entity.getAttribute('data-name') || '';
+            if (!query || name.includes(query)) {
+                entity.classList.remove('hidden');
+                hasMatch = true;
+            } else {
+                entity.classList.add('hidden');
+            }
+        });
+        if (query) {
+            file.classList.toggle('hidden', !hasMatch);
+            if (hasMatch) {
+                file.querySelector('.tree-children')?.classList.remove('hidden');
+            }
+        } else {
+            file.classList.remove('hidden');
+            file.querySelector('.tree-children')?.classList.add('hidden');
+        }
+    });
 }
 
 function showEntity(id, qualifiedName, signature, filePath, lineNum, existingDoc, generatedDoc) {
@@ -141,25 +184,10 @@ function showEntity(id, qualifiedName, signature, filePath, lineNum, existingDoc
 async function reanalyzeRepo(repoId) {
     const response = await fetch(`/repositories/${repoId}/reanalyze/`, {
         method: 'POST',
-        headers: {
-            'X-CSRFToken': getCSRFToken(),
-            'Content-Type': 'application/json'
-        }
+        headers: { 'X-CSRFToken': getCSRFToken(), 'Content-Type': 'application/json' }
     });
     const data = await response.json();
-    if (response.ok) {
-        window.location.href = `/analysis/${data.snapshot_id}/status/`;
-    } else {
-        alert(data.error || 'Failed to start re-analysis');
-    }
+    if (response.ok) window.location.href = `/analysis/${data.snapshot_id}/status/`;
 }
-
-// Expand first level by default
-document.addEventListener('DOMContentLoaded', () => {
-    const firstLevel = document.querySelectorAll('.tree-node');
-    if (firstLevel.length > 0) {
-        toggleNode(firstLevel[0]);
-    }
-});
 </script>
 {% endblock %}

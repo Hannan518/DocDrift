@@ -2,33 +2,11 @@
 
 /* Tree view styles */
 .tree-node {
-    cursor: pointer;
     user-select: none;
 }
 
 .tree-node:hover {
     background-color: #f3f4f6;
-}
-
-.tree-node::before {
-    content: '▸';
-    display: inline-block;
-    width: 1rem;
-    margin-right: 0.25rem;
-    transition: transform 0.2s;
-}
-
-.tree-node.expanded::before {
-    transform: rotate(90deg);
-}
-
-.tree-children {
-    display: none;
-    padding-left: 1.5rem;
-}
-
-.tree-children.visible {
-    display: block;
 }
 
 /* Entity type colors */
@@ -58,6 +36,27 @@
 /* Card hover effect */
 .card-hover:hover {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Step indicator */
+.step-circle {
+    transition: all 0.3s ease;
+}
+
+/* Code display */
+pre code {
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+/* Toast animations */
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+#toast-container > div {
+    animation: slideIn 0.3s ease-out;
 }
 
 /* Mobile responsive adjustments */
