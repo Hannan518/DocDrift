@@ -119,21 +119,27 @@ class PythonASTParser:
         # Build signature parts
         parts = []
         
-        # Positional args
-        for arg in args.args:
-            if arg.arg != 'self' and arg.arg != 'cls':
-                annotation = ast.unparse(arg.annotation) if arg.annotation else ''
-                if annotation:
-                    parts.append(f"{arg.arg}: {annotation}")
-                else:
-                    parts.append(arg.arg)
+        # Filter out self/cls
+        all_args = args.args
+        filtered_args = [a for a in all_args if a.arg not in ('self', 'cls')]
+        has_self = len(all_args) != len(filtered_args)
         
-        # Default values
-        defaults = [ast.unparse(d) for d in args.defaults]
-        if defaults:
-            offset = len(args.args) - len(defaults)
-            for i, default in enumerate(defaults):
-                parts[offset + i] = f"{parts[offset + i]}={default}"
+        # Positional args with defaults
+        num_filtered = len(filtered_args)
+        num_defaults = len(args.defaults)
+        defaults_offset = num_filtered - num_defaults
+        
+        for i, arg in enumerate(filtered_args):
+            annotation = ast.unparse(arg.annotation) if arg.annotation else ''
+            arg_str = f"{arg.arg}: {annotation}" if annotation else arg.arg
+            
+            # Apply default if applicable
+            default_idx = i - defaults_offset
+            if default_idx >= 0:
+                default_val = ast.unparse(args.defaults[default_idx])
+                arg_str = f"{arg_str}={default_val}"
+            
+            parts.append(arg_str)
         
         # Keyword-only args
         for arg in args.kwonlyargs:
