@@ -34,13 +34,23 @@ class PythonASTParser:
                 continue
         return entities
     
-    def parse_file(self, file_path: Path) -> List[ParsedEntity]:
+    def parse_file(self, file_path: Path, root_path: Path = None) -> List[ParsedEntity]:
         """Parse a single Python file."""
         with open(file_path, 'r', encoding='utf-8') as f:
             source = f.read()
         
         tree = ast.parse(source)
-        module_name = file_path.stem
+        
+        # Use relative path to avoid duplicate qualified names (e.g., multiple __init__.py)
+        if root_path and root_path in file_path.parents:
+            rel = file_path.relative_to(root_path)
+            module_name = str(rel).replace('/', '.').replace('\\', '.')
+            if module_name.endswith('.py'):
+                module_name = module_name[:-3]
+            if module_name.endswith('.__init__'):
+                module_name = module_name[:-9]
+        else:
+            module_name = file_path.stem
         
         entities = []
         

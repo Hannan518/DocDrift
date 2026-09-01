@@ -51,7 +51,7 @@ def parse_batch(request, snapshot_id):
         
         for file_path in batch_files:
             try:
-                parsed_entities = parser.parse_file(file_path)
+                parsed_entities = parser.parse_file(file_path, root_path=Path(snapshot.temp_path))
                 
                 for entity in parsed_entities:
                     entities_to_create.append(CodeEntity(
@@ -71,9 +71,9 @@ def parse_batch(request, snapshot_id):
                 logger.error(f"Failed to parse {file_path}: {e}")
                 continue
         
-        # Bulk create entities
+        # Bulk create entities (ignore_conflicts handles any edge case duplicates)
         if entities_to_create:
-            CodeEntity.objects.bulk_create(entities_to_create)
+            CodeEntity.objects.bulk_create(entities_to_create, ignore_conflicts=True)
         
         # Update snapshot
         total_files = len(all_files)
