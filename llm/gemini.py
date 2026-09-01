@@ -62,6 +62,9 @@ class GeminiDocGenerator(BaseLLMProvider):
         Raises:
             Exception: If all retry attempts fail
         """
+        if not self.api_key or self.api_key == 'your-gemini-api-key-here':
+            raise Exception("Gemini API key not configured. Set GEMINI_API_KEY in .env")
+        
         if retry_backoff is None:
             retry_backoff = [1, 2, 4, 8]
         
