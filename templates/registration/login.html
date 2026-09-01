@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Log in — DocGen{% endblock %}
+{% block title %}Log in — DocDrift{% endblock %}
 
 {% block content %}
 <div class="auth-wrap">
@@ -9,7 +9,7 @@
             <span class="brand-mark">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 6 3 12 8 18"/><polyline points="16 6 21 12 16 18"/></svg>
             </span>
-            DocGen
+            DocDrift
         </a>
         <h1 class="auth-title">Welcome back</h1>
         <p class="auth-sub">Log in to your documentation workspace.</p>
@@ -38,7 +38,7 @@
             <button type="submit" class="btn btn--primary">Log in</button>
         </form>
 
-        <p class="auth-alt">New to DocGen? <a href="{% url 'register' %}">Create an account</a></p>
+        <p class="auth-alt">New to DocDrift? <a href="{% url 'register' %}">Create an account</a></p>
     </div>
 </div>
 {% endblock %}

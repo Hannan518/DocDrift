@@ -1,5 +1,5 @@
-// DocGen shared client helpers: theme, toasts, fetch wrapper, nav.
-window.DocGen = (() => {
+// DocDrift shared client helpers: theme, toasts, fetch wrapper, nav.
+window.DocDrift = (() => {
   'use strict';
 
   function getCookie(name) {
@@ -98,7 +98,7 @@ window.DocGen = (() => {
     toggle.addEventListener('click', () => {
       const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', next);
-      try { localStorage.setItem('docgen-theme', next); } catch { /* private mode */ }
+      try { localStorage.setItem('docdrift-theme', next); } catch { /* private mode */ }
       render();
     });
 

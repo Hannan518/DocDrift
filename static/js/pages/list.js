@@ -14,25 +14,25 @@
     if (action === 'delete') {
       if (!window.confirm(`Delete "${name}"? All snapshots and documentation will be removed.`)) return;
       btn.disabled = true;
-      const res = await window.DocGen.api(url);
+      const res = await window.DocDrift.api(url);
       if (res.ok) {
-        window.DocGen.toast(`Deleted "${name}"`, 'success');
+        window.DocDrift.toast(`Deleted "${name}"`, 'success');
         card.remove();
         if (!document.querySelector('[data-repo-card]')) window.location.reload();
       } else {
         btn.disabled = false;
-        window.DocGen.toast((res.data && res.data.error) || 'Delete failed', 'error');
+        window.DocDrift.toast((res.data && res.data.error) || 'Delete failed', 'error');
       }
     }
 
     if (action === 'reanalyze') {
       btn.disabled = true;
-      const res = await window.DocGen.api(url);
+      const res = await window.DocDrift.api(url);
       if (res.ok) {
         window.location.href = `/analysis/${res.data.snapshot_id}/status/`;
       } else {
         btn.disabled = false;
-        window.DocGen.toast((res.data && res.data.error) || 'Could not start re-analysis', 'error');
+        window.DocDrift.toast((res.data && res.data.error) || 'Could not start re-analysis', 'error');
       }
     }
   });

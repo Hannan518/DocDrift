@@ -1,5 +1,5 @@
 /* ==========================================================================
-   DocGen design system
+   DocDrift design system
    Light + dark themes via CSS variables. Theme is set on <html> as
    data-theme="light" | "dark" before first paint (see base.html).
    ========================================================================== */

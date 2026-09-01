@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}DocGen — Documentation that keeps up with your code{% endblock %}
+{% block title %}DocDrift — Documentation that keeps up with your code{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -11,7 +11,7 @@
             CS50W Capstone Project
         </span>
         <h1>Documentation that <span class="grad">keeps up</span> with your code.</h1>
-        <p class="hero__sub">Point DocGen at a GitHub repository. It parses every function and class,
+        <p class="hero__sub">Point DocDrift at a GitHub repository. It parses every function and class,
             writes docstrings with an LLM, and flags the exact places your docs drifted out of date
             the moment your code changes.</p>
         <div class="hero__cta">
@@ -25,7 +25,7 @@
         <div class="hero-demo" aria-hidden="true">
             <div class="hero-demo__bar"><i></i><i></i><i></i><span class="title">drift-dashboard</span></div>
             <div class="hero-demo__body">
-<span class="c">// docgen detects what your docs won't tell you</span><br>
+<span class="c">// docdrift detects what your docs won't tell you</span><br>
 <span class="doc">"""Fetch user profile from the API."""</span>  <span class="c">← written 3 commits ago</span><br>
 <span class="k">def</span> <span class="f">fetch_profile</span>(user_id: <span class="s">str</span>, include_history: <span class="s">bool</span> = <span class="s">False</span>):<br>
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="c">...</span><br>
@@ -46,7 +46,7 @@
             <div class="card step-card">
                 <div class="step-card__num">1</div>
                 <h3>Connect a repository</h3>
-                <p>Paste a public GitHub URL. DocGen shallow-clones it and maps every module,
+                <p>Paste a public GitHub URL. DocDrift shallow-clones it and maps every module,
                     class, and public function with Python's AST.</p>
             </div>
             <div class="card step-card">
@@ -58,7 +58,7 @@
             <div class="card step-card">
                 <div class="step-card__num">3</div>
                 <h3>Detect drift</h3>
-                <p>Re-analyze anytime. DocGen compares snapshots and flags stale docs,
+                <p>Re-analyze anytime. DocDrift compares snapshots and flags stale docs,
                     signature changes, new undocumented code, and orphaned docs.</p>
             </div>
         </div>

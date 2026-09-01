@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Repositories — DocGen{% endblock %}
+{% block title %}Repositories — DocDrift{% endblock %}
 {% block nav_active %}repositories{% endblock %}
 
 {% block content %}
@@ -88,7 +88,7 @@
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M6 16V9M10 16V4M14 16v-7M18 16v-4"/></svg>
             </div>
             <h3>No repositories yet</h3>
-            <p>Point DocGen at a public GitHub repository and it will document every function and class for you.</p>
+            <p>Point DocDrift at a public GitHub repository and it will document every function and class for you.</p>
             <a href="{% url 'repositories:submit' %}" class="btn btn--primary">Analyze your first repository</a>
         </div>
     {% endif %}

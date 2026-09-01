@@ -4,13 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}DocGen{% endblock %}</title>
+    <title>{% block title %}DocDrift{% endblock %}</title>
 
     <script>
     // Set theme before first paint to avoid a flash.
     (function () {
         var theme;
-        try { theme = localStorage.getItem('docgen-theme'); } catch (e) {}
+        try { theme = localStorage.getItem('docdrift-theme'); } catch (e) {}
         if (theme !== 'light' && theme !== 'dark') {
             theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         }
@@ -36,7 +36,7 @@
                     <span class="brand-mark">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 6 3 12 8 18"/><polyline points="16 6 21 12 16 18"/></svg>
                     </span>
-                    DocGen
+                    DocDrift
                 </a>
 
                 <div class="nav-links">
@@ -99,7 +99,7 @@
 
     <footer class="footer">
         <div class="container">
-            <span>DocGen &mdash; auto-generated docs with drift detection</span>
+            <span>DocDrift &mdash; auto-generated docs with drift detection</span>
             <span>CS50W Capstone Project</span>
         </div>
     </footer>

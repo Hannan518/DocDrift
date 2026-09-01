@@ -1,4 +1,4 @@
-# Codebase Documentation Generator with Drift Detection
+# DocDrift
 
 A Django + JavaScript web application that analyzes Python codebases, auto-generates documentation using Google's Gemini AI, and detects when code has drifted from its documentation on subsequent analysis runs.
 
@@ -84,7 +84,7 @@ Capstone/
 │   └── tests/
 │       ├── test_parser.py         # Async, docstring-excluded hashes, signatures
 │       ├── test_drift.py          # Idempotency, flag conditions, unified diff
-│       ├── test_docgen_cursor.py  # Cursor pagination, termination, no skips
+│       ├── test_docdrift_cursor.py  # Cursor pagination, termination, no skips
 │       └── fixtures/              # simple.py, nested_classes.py, complex_module.py
 │
 ├── llm/                           # LLM integration (swappable)

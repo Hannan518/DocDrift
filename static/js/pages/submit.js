@@ -30,10 +30,10 @@
       github_url: urlInput.value.trim(),
     };
 
-    const res = await window.DocGen.api(form.dataset.url, { body: payload });
+    const res = await window.DocDrift.api(form.dataset.url, { body: payload });
 
     if (res.ok && res.data.snapshot_id) {
-      window.DocGen.toast('Repository submitted — starting analysis', 'success');
+      window.DocDrift.toast('Repository submitted — starting analysis', 'success');
       window.location.href = `/analysis/${res.data.snapshot_id}/status/`;
       return;
     }

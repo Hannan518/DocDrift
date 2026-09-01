@@ -17,7 +17,7 @@ def clone_github_repo(github_url: str) -> str:
     Returns:
         Path to the cloned directory
     """
-    temp_dir = tempfile.mkdtemp(prefix='docgen_')
+    temp_dir = tempfile.mkdtemp(prefix='docdrift_')
     
     try:
         Repo.clone_from(
@@ -45,7 +45,7 @@ def extract_zip_upload(upload_file) -> str:
     """
     import zipfile
     
-    temp_dir = tempfile.mkdtemp(prefix='docgen_')
+    temp_dir = tempfile.mkdtemp(prefix='docdrift_')
     
     try:
         # Handle Django UploadedFile or regular file

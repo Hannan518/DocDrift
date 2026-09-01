@@ -5,7 +5,7 @@
 (() => {
   'use strict';
 
-  const cfg = window.DOCGEN_SNAPSHOT;
+  const cfg = window.DOCDRIFT_SNAPSHOT;
   if (!cfg) return;
 
   const els = {
@@ -21,7 +21,7 @@
 
   const PARSE_BATCH = 10;
   const DOC_BATCH = 10;
-  const MAX_DOCGEN_ROUNDS = 4; // 1 initial pass + up to 3 retry passes
+  const MAX_DOCDRIFT_ROUNDS = 4; // 1 initial pass + up to 3 retry passes
 
   const errorEl = document.getElementById('snapshot-error-message');
   const serverError = errorEl ? JSON.parse(errorEl.textContent) : null;
@@ -63,7 +63,7 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRFToken': window.DocGen.csrf(),
+          'X-CSRFToken': window.DocDrift.csrf(),
         },
         body: body !== undefined ? JSON.stringify(body) : undefined,
       });
@@ -106,10 +106,10 @@
       : `All ${res.data.entities_copied} docs carried over from the previous snapshot`, 32);
   }
 
-  async function runDocGeneration() {
+  async function runDocDrifteration() {
     let documentedTotal = null;
 
-    for (let round = 0; round < MAX_DOCGEN_ROUNDS; round++) {
+    for (let round = 0; round < MAX_DOCDRIFT_ROUNDS; round++) {
       let afterId = 0;
       let failures = 0;
 
@@ -137,7 +137,7 @@
         await sleep(50);
       }
 
-      if (failures === 0 || round === MAX_DOCGEN_ROUNDS - 1) break;
+      if (failures === 0 || round === MAX_DOCDRIFT_ROUNDS - 1) break;
       updateUI('Retrying entities that failed doc generation…');
       await sleep(1500);
     }
@@ -196,7 +196,7 @@
 
       if (from <= PHASES.genDocs) {
         steps.doneUpTo(3);
-        await runDocGeneration();
+        await runDocDrifteration();
       }
 
       steps.doneUpTo(4);

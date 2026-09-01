@@ -151,7 +151,7 @@
     }
 
     if (hits === 0) {
-      window.DocGen.toast('No matching entities', 'info');
+      window.DocDrift.toast('No matching entities', 'info');
     }
   });
 

@@ -91,12 +91,12 @@
 
     if (btn.dataset.action === 'reanalyze') {
       btn.disabled = true;
-      const res = await window.DocGen.api(btn.dataset.url);
+      const res = await window.DocDrift.api(btn.dataset.url);
       if (res.ok) {
         window.location.href = `/analysis/${res.data.snapshot_id}/status/`;
       } else {
         btn.disabled = false;
-        window.DocGen.toast((res.data && res.data.error) || 'Could not start re-analysis', 'error');
+        window.DocDrift.toast((res.data && res.data.error) || 'Could not start re-analysis', 'error');
       }
     }
   });
