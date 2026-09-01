@@ -7,6 +7,7 @@ from django.conf import settings
 import json
 import logging
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .models import Snapshot, CodeEntity, DriftFlag
 from .parser import PythonASTParser
@@ -206,23 +207,30 @@ def generate_docs_batch(request, snapshot_id):
                 'status': 'docs_complete'
             })
         
-        # Generate docs
+        # Generate docs in parallel
         llm_client = GeminiDocGenerator(api_key=settings.GEMINI_API_KEY)
         
-        for entity in entities:
+        def generate_one(entity):
             try:
-                entity.generated_docstring = llm_client.generate_docstring(
+                docstring = llm_client.generate_docstring(
                     entity_type=entity.entity_type,
                     name=entity.name,
                     signature=entity.signature,
                     body=entity.source_body
                 )
+                entity.generated_docstring = docstring
                 entity.doc_source = 'generated'
                 entity.doc_last_generated = timezone.now()
                 entity.save()
+                return True
             except Exception as e:
                 logger.error(f"Doc generation failed for {entity.qualified_name}: {e}")
-                # Continue with next entity
+                return False
+        
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = {executor.submit(generate_one, entity): entity for entity in entities}
+            for future in as_completed(futures):
+                future.result()  # Raise any unexpected errors
         
         # Count remaining
         total_remaining = snapshot.entities.filter(

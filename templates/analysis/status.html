@@ -5,10 +5,43 @@
 
 {% block content %}
 <div class="px-4 sm:px-0">
-    <h1 class="text-3xl font-bold text-gray-900 mb-8">Analysis in Progress</h1>
+    <div class="mb-8">
+        <a href="{% url 'repositories:list' %}" class="text-sm text-blue-600 hover:text-blue-500">&larr; Back to Repositories</a>
+        <h1 class="text-3xl font-bold text-gray-900 mt-2">Analysis in Progress</h1>
+    </div>
 
-    <div class="bg-white shadow sm:rounded-lg">
+    <div class="bg-white shadow sm:rounded-lg mb-6">
         <div class="px-4 py-5 sm:p-6">
+            <!-- Step Indicator -->
+            <div class="mb-8">
+                <div class="flex items-center justify-between">
+                    <div id="step-1" class="flex flex-col items-center step">
+                        <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600 step-circle">1</div>
+                        <span class="text-xs text-gray-500 mt-1">Prepare</span>
+                    </div>
+                    <div class="flex-1 h-1 bg-gray-200 mx-2 step-line" id="line-1"></div>
+                    <div id="step-2" class="flex flex-col items-center step">
+                        <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600 step-circle">2</div>
+                        <span class="text-xs text-gray-500 mt-1">Parse</span>
+                    </div>
+                    <div class="flex-1 h-1 bg-gray-200 mx-2 step-line" id="line-2"></div>
+                    <div id="step-3" class="flex flex-col items-center step">
+                        <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600 step-circle">3</div>
+                        <span class="text-xs text-gray-500 mt-1">Copy Docs</span>
+                    </div>
+                    <div class="flex-1 h-1 bg-gray-200 mx-2 step-line" id="line-3"></div>
+                    <div id="step-4" class="flex flex-col items-center step">
+                        <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600 step-circle">4</div>
+                        <span class="text-xs text-gray-500 mt-1">Generate Docs</span>
+                    </div>
+                    <div class="flex-1 h-1 bg-gray-200 mx-2 step-line" id="line-4"></div>
+                    <div id="step-5" class="flex flex-col items-center step">
+                        <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600 step-circle">5</div>
+                        <span class="text-xs text-gray-500 mt-1">Drift</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Status Message -->
             <div class="mb-6">
                 <h2 class="text-lg font-medium text-gray-900 mb-2">Current Status</h2>
@@ -32,6 +65,10 @@
                     <div class="ml-3">
                         <h3 class="text-sm font-medium text-red-800">Error</h3>
                         <div class="mt-2 text-sm text-red-700" id="error-message"></div>
+                        <button onclick="window.location.reload()" 
+                                class="mt-3 text-sm text-red-800 underline hover:text-red-900">
+                            Retry
+                        </button>
                     </div>
                 </div>
             </div>
@@ -40,46 +77,109 @@
             <div class="bg-gray-50 rounded-md p-4">
                 <h3 class="text-sm font-medium text-gray-900 mb-2">What's happening?</h3>
                 <ul class="text-sm text-gray-600 space-y-1">
-                    <li>• Preparing repository (cloning and validation)</li>
-                    <li>• Parsing Python files in batches</li>
-                    <li>• Generating documentation for new entities</li>
-                    <li>• Detecting drift from previous snapshot (if any)</li>
+                    <li>1. Cloning repository and validating file count</li>
+                    <li>2. Parsing Python files via AST (batches of 10)</li>
+                    <li>3. Copying unchanged docs from previous snapshot</li>
+                    <li>4. Generating docs for new/changed entities via Gemini</li>
+                    <li>5. Detecting drift from previous snapshot</li>
                 </ul>
             </div>
         </div>
     </div>
 </div>
 
+<style>
+.step-circle.active { background-color: #3b82f6; color: white; }
+.step-circle.done { background-color: #10b981; color: white; }
+.step-circle.error { background-color: #ef4444; color: white; }
+.step-line.active { background-color: #3b82f6; }
+.step-line.done { background-color: #10b981; }
+</style>
+
 <script>
 class AnalysisOrchestrator {
-    constructor(snapshotId) {
+    constructor(snapshotId, currentStatus) {
         this.snapshotId = snapshotId;
+        this.currentStatus = currentStatus;
         this.parsingBatchSize = 10;
-        this.docGenBatchSize = 5;
+        this.docGenBatchSize = 20;
     }
     
-    async runFullAnalysis() {
+    setStep(stepNum, state) {
+        const circle = document.querySelector(`#step-${stepNum} .step-circle`);
+        const line = document.getElementById(`line-${stepNum}`);
+        if (circle) {
+            circle.classList.remove('active', 'done', 'error');
+            if (state === 'active') circle.classList.add('active');
+            else if (state === 'done') circle.classList.add('done');
+            else if (state === 'error') circle.classList.add('error');
+        }
+        if (line) {
+            line.classList.remove('active', 'done');
+            if (state === 'done') line.classList.add('done');
+            else if (state === 'active') line.classList.add('active');
+        }
+    }
+    
+    markStepsDone(upTo) {
+        for (let i = 1; i <= upTo; i++) {
+            this.setStep(i, 'done');
+        }
+        if (upTo < 5) this.setStep(upTo + 1, 'active');
+    }
+    
+    async runFromStatus() {
+        const s = this.currentStatus;
+        
+        if (s === 'complete') {
+            window.location.href = `/analysis/${this.snapshotId}/browser/`;
+            return;
+        }
+        
+        if (s === 'failed') {
+            this.showError('Analysis failed. Go back and re-analyze.');
+            return;
+        }
+        
         try {
-            // Phase 0: Prepare (clone/validate)
-            this.updateUI('Preparing repository...', 0);
-            await this.prepare();
+            if (s === 'pending') {
+                this.markStepsDone(0);
+                this.updateUI('Cloning repository...', 2);
+                await this.prepare();
+                this.setStep(1, 'done');
+            }
             
-            // Phase 1: Parse files (0-30%)
-            await this.runParsing();
+            if (['ready_to_parse', 'parsing', 'parsing_complete'].includes(s)) {
+                this.markStepsDone(1);
+                if (s !== 'parsing_complete') {
+                    this.updateUI('Parsing files...', 5);
+                    await this.runParsing();
+                }
+                this.setStep(2, 'done');
+            }
             
-            // Phase 2: Prepare docs (copy forward unchanged)
-            await this.prepareDocs();
+            if (['parsing_complete', 'generating_docs', 'docs_complete'].includes(s)) {
+                this.markStepsDone(2);
+                if (s !== 'docs_complete') {
+                    await this.prepareDocs();
+                    this.updateUI('Generating documentation...', 35);
+                    await this.runDocGeneration();
+                }
+                this.setStep(4, 'done');
+            }
             
-            // Phase 3: Generate docs for NEW entities (30-90%)
-            await this.runDocGeneration();
+            if (['docs_complete', 'detecting_drift', 'complete'].includes(s)) {
+                this.markStepsDone(4);
+                if (s !== 'complete') {
+                    await this.runDriftDetection();
+                }
+                this.setStep(5, 'done');
+            }
             
-            // Phase 4: Detect drift (90-100%)
-            await this.runDriftDetection();
-            
-            // Complete
             this.updateUI('Analysis complete!', 100);
             await this.sleep(1000);
             window.location.href = `/analysis/${this.snapshotId}/browser/`;
+            
         } catch (error) {
             this.showError(error.message);
         }
@@ -90,46 +190,31 @@ class AnalysisOrchestrator {
             `/repositories/${this.snapshotId}/prepare/`,
             { method: 'POST' }
         );
-        
-        if (!data.ok) {
-            throw new Error(data.data.error || 'Preparation failed');
-        }
+        if (!data.ok) throw new Error(data.data.error || 'Preparation failed');
     }
     
     async runParsing() {
         let offset = 0;
-        let total = null;
-        
         while (true) {
             const data = await this.fetchJSON(
                 `/analysis/${this.snapshotId}/parse-batch/`,
-                {
-                    method: 'POST',
-                    body: JSON.stringify({ offset, limit: this.parsingBatchSize }),
-                }
+                { method: 'POST', body: JSON.stringify({ offset, limit: this.parsingBatchSize }) }
             );
-            
-            if (!data.ok) throw new Error('Parsing failed');
-            
-            total = data.data.total;
-            const progress = (data.data.parsed / total) * 30;
-            this.updateUI(`Parsing files (${offset + data.data.parsed}/${total})`, progress);
-            
+            if (!data.ok) throw new Error('Parsing failed: ' + (data.data.error || 'Unknown error'));
+            const total = data.data.total;
+            const progress = 5 + ((offset + data.data.parsed) / total) * 25;
+            this.updateUI(`Parsing files (${offset + data.data.parsed}/${total})`, Math.round(progress));
             if (!data.data.next_offset) break;
             offset = data.data.next_offset;
-            
-            await this.sleep(100);
+            await this.sleep(50);
         }
     }
     
     async prepareDocs() {
-        this.updateUI('Preparing documentation...', 30);
-        
         const data = await this.fetchJSON(
             `/analysis/${this.snapshotId}/prepare-docs/`,
             { method: 'POST' }
         );
-        
         if (data.ok) {
             this.updateUI(
                 `Copied ${data.data.entities_copied} unchanged docs, generating ${data.data.entities_to_document} new`,
@@ -140,43 +225,32 @@ class AnalysisOrchestrator {
     
     async runDocGeneration() {
         let offset = 0;
-        
         while (true) {
             const data = await this.fetchJSON(
                 `/analysis/${this.snapshotId}/generate-docs-batch/`,
-                {
-                    method: 'POST',
-                    body: JSON.stringify({ offset, limit: this.docGenBatchSize }),
-                }
+                { method: 'POST', body: JSON.stringify({ offset, limit: this.docGenBatchSize }) }
             );
-            
-            if (!data.ok) throw new Error('Doc generation failed');
-            
+            if (!data.ok) throw new Error('Doc generation failed: ' + (data.data.error || 'Unknown error'));
             const totalProcessed = offset + data.data.processed;
             const totalEntities = totalProcessed + data.data.remaining;
             const progress = 35 + ((totalProcessed / (totalEntities || 1)) * 55);
-            
             this.updateUI(
                 `Generating documentation (${totalProcessed}/${totalEntities})`,
                 Math.round(progress)
             );
-            
             if (data.data.remaining === 0) break;
             offset += data.data.processed;
-            
-            await this.sleep(100);
+            await this.sleep(50);
         }
     }
     
     async runDriftDetection() {
         this.updateUI('Detecting drift...', 90);
-        
         await this.fetchJSON(
             `/analysis/${this.snapshotId}/detect-drift/`,
             { method: 'POST' }
         );
-        
-        this.updateUI('Drift detection complete', 100);
+        this.setStep(5, 'done');
     }
     
     async fetchJSON(url, options = {}) {
@@ -186,14 +260,9 @@ class AnalysisOrchestrator {
                 'X-CSRFToken': this.getCookie('csrftoken'),
             },
         };
-        
         const response = await fetch(url, { ...defaultOptions, ...options });
         const data = await response.json();
-        
-        if (!response.ok) {
-            return { ok: false, data };
-        }
-        
+        if (!response.ok) return { ok: false, data };
         return { ok: true, data };
     }
     
@@ -206,6 +275,7 @@ class AnalysisOrchestrator {
     showError(message) {
         document.getElementById('error-container').classList.remove('hidden');
         document.getElementById('error-message').textContent = message;
+        document.getElementById('status-message').textContent = 'Error occurred';
     }
     
     sleep(ms) {
@@ -213,23 +283,18 @@ class AnalysisOrchestrator {
     }
     
     getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            cookie = cookie.trim();
+            if (cookie.startsWith(name + '=')) {
+                return decodeURIComponent(cookie.substring(name.length + 1));
             }
         }
-        return cookieValue;
+        return '';
     }
 }
 
-// Start orchestration
-const orchestrator = new AnalysisOrchestrator({{ snapshot.id }});
-orchestrator.runFullAnalysis();
+const orchestrator = new AnalysisOrchestrator({{ snapshot.id }}, '{{ snapshot.status }}');
+orchestrator.runFromStatus();
 </script>
 {% endblock %}
