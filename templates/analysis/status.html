@@ -1,0 +1,235 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Analysis Status{% endblock %}
+
+{% block content %}
+<div class="px-4 sm:px-0">
+    <h1 class="text-3xl font-bold text-gray-900 mb-8">Analysis in Progress</h1>
+
+    <div class="bg-white shadow sm:rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <!-- Status Message -->
+            <div class="mb-6">
+                <h2 class="text-lg font-medium text-gray-900 mb-2">Current Status</h2>
+                <p id="status-message" class="text-sm text-gray-600">Initializing...</p>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="mb-6">
+                <div class="flex justify-between mb-2">
+                    <span class="text-sm font-medium text-gray-700">Progress</span>
+                    <span id="progress-text" class="text-sm font-medium text-gray-700">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Error Container -->
+            <div id="error-container" class="hidden rounded-md bg-red-50 p-4 mb-6">
+                <div class="flex">
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-red-800">Error</h3>
+                        <div class="mt-2 text-sm text-red-700" id="error-message"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info -->
+            <div class="bg-gray-50 rounded-md p-4">
+                <h3 class="text-sm font-medium text-gray-900 mb-2">What's happening?</h3>
+                <ul class="text-sm text-gray-600 space-y-1">
+                    <li>• Preparing repository (cloning and validation)</li>
+                    <li>• Parsing Python files in batches</li>
+                    <li>• Generating documentation for new entities</li>
+                    <li>• Detecting drift from previous snapshot (if any)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+class AnalysisOrchestrator {
+    constructor(snapshotId) {
+        this.snapshotId = snapshotId;
+        this.parsingBatchSize = 10;
+        this.docGenBatchSize = 5;
+    }
+    
+    async runFullAnalysis() {
+        try {
+            // Phase 0: Prepare (clone/validate)
+            this.updateUI('Preparing repository...', 0);
+            await this.prepare();
+            
+            // Phase 1: Parse files (0-30%)
+            await this.runParsing();
+            
+            // Phase 2: Prepare docs (copy forward unchanged)
+            await this.prepareDocs();
+            
+            // Phase 3: Generate docs for NEW entities (30-90%)
+            await this.runDocGeneration();
+            
+            // Phase 4: Detect drift (90-100%)
+            await this.runDriftDetection();
+            
+            // Complete
+            this.updateUI('Analysis complete!', 100);
+            await this.sleep(1000);
+            window.location.href = `/analysis/${this.snapshotId}/browser/`;
+        } catch (error) {
+            this.showError(error.message);
+        }
+    }
+    
+    async prepare() {
+        const data = await this.fetchJSON(
+            `/repositories/${this.snapshotId}/prepare/`,
+            { method: 'POST' }
+        );
+        
+        if (!data.ok) {
+            throw new Error(data.data.error || 'Preparation failed');
+        }
+    }
+    
+    async runParsing() {
+        let offset = 0;
+        let total = null;
+        
+        while (true) {
+            const data = await this.fetchJSON(
+                `/analysis/${this.snapshotId}/parse-batch/`,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ offset, limit: this.parsingBatchSize }),
+                }
+            );
+            
+            if (!data.ok) throw new Error('Parsing failed');
+            
+            total = data.data.total;
+            const progress = (data.data.parsed / total) * 30;
+            this.updateUI(`Parsing files (${offset + data.data.parsed}/${total})`, progress);
+            
+            if (!data.data.next_offset) break;
+            offset = data.data.next_offset;
+            
+            await this.sleep(100);
+        }
+    }
+    
+    async prepareDocs() {
+        this.updateUI('Preparing documentation...', 30);
+        
+        const data = await this.fetchJSON(
+            `/analysis/${this.snapshotId}/prepare-docs/`,
+            { method: 'POST' }
+        );
+        
+        if (data.ok) {
+            this.updateUI(
+                `Copied ${data.data.entities_copied} unchanged docs, generating ${data.data.entities_to_document} new`,
+                35
+            );
+        }
+    }
+    
+    async runDocGeneration() {
+        let offset = 0;
+        
+        while (true) {
+            const data = await this.fetchJSON(
+                `/analysis/${this.snapshotId}/generate-docs-batch/`,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ offset, limit: this.docGenBatchSize }),
+                }
+            );
+            
+            if (!data.ok) throw new Error('Doc generation failed');
+            
+            const totalProcessed = offset + data.data.processed;
+            const totalEntities = totalProcessed + data.data.remaining;
+            const progress = 35 + ((totalProcessed / (totalEntities || 1)) * 55);
+            
+            this.updateUI(
+                `Generating documentation (${totalProcessed}/${totalEntities})`,
+                Math.round(progress)
+            );
+            
+            if (data.data.remaining === 0) break;
+            offset += data.data.processed;
+            
+            await this.sleep(100);
+        }
+    }
+    
+    async runDriftDetection() {
+        this.updateUI('Detecting drift...', 90);
+        
+        await this.fetchJSON(
+            `/analysis/${this.snapshotId}/detect-drift/`,
+            { method: 'POST' }
+        );
+        
+        this.updateUI('Drift detection complete', 100);
+    }
+    
+    async fetchJSON(url, options = {}) {
+        const defaultOptions = {
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCookie('csrftoken'),
+            },
+        };
+        
+        const response = await fetch(url, { ...defaultOptions, ...options });
+        const data = await response.json();
+        
+        if (!response.ok) {
+            return { ok: false, data };
+        }
+        
+        return { ok: true, data };
+    }
+    
+    updateUI(message, progress) {
+        document.getElementById('status-message').textContent = message;
+        document.getElementById('progress-bar').style.width = `${progress}%`;
+        document.getElementById('progress-text').textContent = `${Math.round(progress)}%`;
+    }
+    
+    showError(message) {
+        document.getElementById('error-container').classList.remove('hidden');
+        document.getElementById('error-message').textContent = message;
+    }
+    
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+    
+    getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+}
+
+// Start orchestration
+const orchestrator = new AnalysisOrchestrator({{ snapshot.id }});
+orchestrator.runFullAnalysis();
+</script>
+{% endblock %}
