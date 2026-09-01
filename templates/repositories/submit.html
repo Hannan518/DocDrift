@@ -81,6 +81,17 @@
 </div>
 
 <script>
+function getCSRFToken() {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        cookie = cookie.trim();
+        if (cookie.startsWith('csrftoken=')) {
+            return cookie.substring('csrftoken='.length);
+        }
+    }
+    return '';
+}
+
 document.getElementById('submit-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -104,7 +115,7 @@ document.getElementById('submit-form').addEventListener('submit', async (e) => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
+                'X-CSRFToken': getCSRFToken()
             },
             body: JSON.stringify(formData)
         });
