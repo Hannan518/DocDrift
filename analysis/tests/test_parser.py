@@ -85,23 +85,28 @@ class TestParserSimpleModule:
             assert e1.source_hash == e2.source_hash
 
 
-class TestParserNestedClasses:
-    """Tests for parsing nested_classes.py fixture."""
-    
+class TestParserClassesWithMethods:
+    """Tests for parsing classes with public/private methods. The
+    fixture (formerly nested_classes.py) actually verifies top-level
+    classes plus their public methods; the parser does not recurse
+    into nested class bodies, so InnerClass inside OuterClass is
+    intentionally absent from the parsed output - this is a known
+    limitation (see README)."""
+
     def test_finds_outer_class(self, parser):
-        entities = parser.parse_file(FIXTURES_DIR / 'nested_classes.py')
+        entities = parser.parse_file(FIXTURES_DIR / 'classes_with_methods.py')
         outer = next((e for e in entities if e.name == 'OuterClass'), None)
         assert outer is not None
         assert outer.entity_type == 'class'
-    
+
     def test_finds_outer_methods(self, parser):
-        entities = parser.parse_file(FIXTURES_DIR / 'nested_classes.py')
-        outer_methods = [e for e in entities if e.parent_qualified_name == 'nested_classes.OuterClass']
+        entities = parser.parse_file(FIXTURES_DIR / 'classes_with_methods.py')
+        outer_methods = [e for e in entities if e.parent_qualified_name == 'classes_with_methods.OuterClass']
         assert len(outer_methods) >= 1  # outer_method
-    
+
     def test_nested_class_not_supported(self, parser):
-        """Inner classes inside outer classes are not extracted (best-effort limitation)."""
-        entities = parser.parse_file(FIXTURES_DIR / 'nested_classes.py')
+        """Inner classes inside outer classes are not extracted (known limitation)."""
+        entities = parser.parse_file(FIXTURES_DIR / 'classes_with_methods.py')
         # InnerClass is inside OuterClass, parser doesn't recurse into nested classes
         inner = next((e for e in entities if e.name == 'InnerClass'), None)
         # This is expected behavior - nested classes are a known limitation
