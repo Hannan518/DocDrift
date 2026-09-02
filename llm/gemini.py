@@ -127,7 +127,17 @@ class GeminiDocGenerator(BaseLLMProvider):
                         logger.debug("Model %s not available, trying next", model)
                         continue
 
-                    # Rate limit - retry with backoff
+                    # Rate limit - on 429 specifically, advance to the next
+                    # model in the fallback list rather than re-trying the
+                    # one that just 429'd. Each model has its own quota, so
+                    # this gives the worker the best chance of finding one
+                    # with remaining headroom. On other transient errors
+                    # (transient connection drops, etc.) retry the same
+                    # model after a backoff.
+                    is_429 = error_code == 429 or 'quota' in error_str
+                    if is_429:
+                        logger.debug("Model %s returned 429, trying next", model)
+                        continue
                     if error_code == 429 or 'resource' in error_str or 'rate' in error_str:
                         if attempt < retry_attempts - 1:
                             wait_time = retry_backoff[min(attempt, len(retry_backoff) - 1)]
