@@ -54,3 +54,6 @@ Thumbs.db
 
 # ZCode session state
 .zcode/
+
+# Playwright screenshots
+screenshots/

@@ -5,113 +5,175 @@
 {% block content %}
 <div class="container">
 
+    {# ── Hero ──────────────────────────────────────────────────────── #}
     <section class="hero">
-        <span class="hero__badge">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
-            CS50W Capstone Project
-        </span>
-        <h1>Documentation that <span class="grad">keeps up</span> with your code.</h1>
-        <p class="hero__sub">Point DocDrift at a GitHub repository. It parses every function and class,
-            writes docstrings with an LLM, and flags the exact places your docs drifted out of date
-            the moment your code changes.</p>
-        <div class="hero__cta">
-            <a href="{% url 'register' %}" class="btn btn--primary">
-                Analyze a repository
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-            </a>
-            <a href="#how" class="btn btn--secondary">See how it works</a>
+        <div class="hero__inner">
+            <span class="hero__badge">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
+                CS50W Capstone Project
+            </span>
+            <h1>Documentation that <span class="grad">keeps up</span> with your code.</h1>
+            <p class="hero__sub">Point DocDrift at a GitHub repository. It parses every public function and class with Python's AST, writes Google-style docstrings with an LLM, and flags the exact places your docs drifted out of date the moment your code changes.</p>
+            <div class="hero__cta">
+                <a href="{% url 'register' %}" class="btn btn--primary btn--lg">
+                    Analyze a repository
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </a>
+                <a href="#how" class="btn btn--secondary btn--lg">See how it works</a>
+            </div>
+            <ul class="hero__trust">
+                <li>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>
+                    Public GitHub repos
+                </li>
+                <li>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>
+                    AST-accurate, no regex
+                </li>
+                <li>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>
+                    Light + dark, mobile-ready
+                </li>
+            </ul>
         </div>
 
         <div class="hero-demo" aria-hidden="true">
-            <div class="hero-demo__bar"><i></i><i></i><i></i><span class="title">drift-dashboard</span></div>
+            <div class="hero-demo__bar">
+                <i></i><i></i><i></i>
+                <span class="title">drift-dashboard</span>
+                <span class="status">live</span>
+            </div>
             <div class="hero-demo__body">
-<span class="c">// docdrift detects what your docs won't tell you</span><br>
-<span class="doc">"""Fetch user profile from the API."""</span>  <span class="c">← written 3 commits ago</span><br>
-<span class="k">def</span> <span class="f">fetch_profile</span>(user_id: <span class="s">str</span>, include_history: <span class="s">bool</span> = <span class="s">False</span>):<br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="c">...</span><br>
+<span class="c"># docdrift detected 3 drift flags in your last analysis</span><br>
+<span class="k">class</span> <span class="f">UserProfile</span>(<span class="s">BaseModel</span>):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="doc">"""Fetch user profile from the API."""</span>  <span class="c">← written 3 commits ago</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="k">def</span> <span class="f">fetch</span>(self, user_id: <span class="s">str</span>, include_history: <span class="s">bool</span> = <span class="s">False</span>):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;...<br>
 <br>
-<span class="doc">⚠ stale_doc</span>&nbsp;&nbsp;<span class="s">fetch_profile</span> — body changed, doc regenerated<br>
-<span class="doc">⚠ signature_changed</span>&nbsp;&nbsp;+ include_history: bool added<br>
-<span class="doc">✓ 38 entities documented · 0 orphaned</span>
+<span class="flag flag--stale">⚠ stale_doc</span>          <span class="f">UserProfile.fetch</span>  — body changed, doc out of date<br>
+<span class="flag flag--sig">⚠ signature_changed</span>  <span class="f">UserProfile.fetch</span>  — <span class="c">+ include_history: bool</span><br>
+<span class="flag flag--ok">✓ 38 entities documented</span>     <span class="c">·</span>  <span class="flag flag--ok">0 orphaned</span>
             </div>
         </div>
     </section>
 
-    <section class="landing-section" id="how">
+    {# ── Feature pillars (was: 6-tile grid; now: 4 weighted pillars) ── #}
+    <section class="pillars">
+        <div class="pillar">
+            <div class="pillar__icon" style="--icon-color: #6366f1; --icon-bg: rgb(99 102 241 / 0.10);">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M6 16V9M10 16V4M14 16v-7M18 16v-4"/></svg>
+            </div>
+            <h3>Snapshot history</h3>
+            <p>Every analysis is a snapshot. Browse any version of your docs and see exactly when each line was written.</p>
+        </div>
+        <div class="pillar">
+            <div class="pillar__icon" style="--icon-color: #10b981; --icon-bg: rgb(16 185 129 / 0.10);">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 17V9h6M9 13h5"/></svg>
+            </div>
+            <h3>AST-accurate</h3>
+            <p>Real Python parsing — not regex. Signatures, async support, source hashes, and class-method relationships.</p>
+        </div>
+        <div class="pillar">
+            <div class="pillar__icon" style="--icon-color: #f59e0b; --icon-bg: rgb(245 158 11 / 0.10);">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+            </div>
+            <h3>Token-efficient re-runs</h3>
+            <p>Hash-based change detection means re-analysis only burns tokens on code that actually changed.</p>
+        </div>
+        <div class="pillar">
+            <div class="pillar__icon" style="--icon-color: #ec4899; --icon-bg: rgb(236 72 153 / 0.10);">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M21 3l-7 7M8 21H3v-5M3 21l7-7"/></svg>
+            </div>
+            <h3>Real unified diffs</h3>
+            <p>Every drift flag ships a line-by-line diff of the source change, rendered inside the dashboard.</p>
+        </div>
+    </section>
+
+    {# ── How it works (3 steps) ───────────────────────────────────── #}
+    <section class="how" id="how">
         <div class="landing-section__head">
             <h2>Three steps, fully automatic</h2>
-            <p>From a repository URL to a documented, drift-monitored codebase.</p>
+            <p>From a public GitHub URL to a documented, drift-monitored codebase.</p>
         </div>
         <div class="steps-grid">
             <div class="card step-card">
-                <div class="step-card__num">1</div>
+                <div class="step-card__num">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                </div>
                 <h3>Connect a repository</h3>
-                <p>Paste a public GitHub URL. DocDrift shallow-clones it and maps every module,
-                    class, and public function with Python's AST.</p>
+                <p>Paste a public GitHub URL. DocDrift shallow-clones it and maps every module, class, and public function with Python's <code>ast</code>.</p>
             </div>
             <div class="card step-card">
-                <div class="step-card__num">2</div>
+                <div class="step-card__num">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 9 9l-7 1 5 5-1 7 6-3 6 3-1-7 5-5-7-1z"/></svg>
+                </div>
                 <h3>Generate documentation</h3>
-                <p>An LLM writes a Google-style docstring for each entity. Unchanged code
-                    keeps its docs on re-runs — you only pay for what changed.</p>
+                <p>An LLM writes a Google-style docstring for each entity. Unchanged code keeps its docs on re-runs — you only pay for what changed.</p>
             </div>
             <div class="card step-card">
-                <div class="step-card__num">3</div>
+                <div class="step-card__num">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                </div>
                 <h3>Detect drift</h3>
-                <p>Re-analyze anytime. DocDrift compares snapshots and flags stale docs,
-                    signature changes, new undocumented code, and orphaned docs.</p>
+                <p>Re-analyze anytime. DocDrift compares snapshots and flags stale docs, signature changes, new undocumented code, and orphaned docs.</p>
             </div>
         </div>
     </section>
 
-    <section class="landing-section">
+    {# ── Drift types (the unique selling point) ───────────────────── #}
+    <section class="drift-types">
         <div class="landing-section__head">
-            <h2>Everything you need to keep docs honest</h2>
+            <h2>Four kinds of drift, caught automatically</h2>
+            <p>Every snapshot comparison produces one or more of these flags, each with a real unified diff attached.</p>
         </div>
-        <div class="features-grid">
-            <div class="card feature-card">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M6 16V9M10 16V4M14 16v-7M18 16v-4"/></svg>
-                <h3>Snapshot history</h3>
-                <p>Every analysis is a snapshot. Browse any version of your codebase's
-                    documentation and see how it evolved.</p>
+        <div class="drift-grid">
+            <div class="drift-card drift-card--stale">
+                <div class="drift-card__icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>
+                </div>
+                <div>
+                    <h3>stale_doc</h3>
+                    <p>Code body changed, prior doc preserved. Review the diff and regenerate just this one when you're ready.</p>
+                </div>
             </div>
-            <div class="card feature-card">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 17V9h6M9 13h5"/></svg>
-                <h3>AST-accurate</h3>
-                <p>No regex guesswork — real Python parsing with signatures, source hashes,
-                    and class-method relationships.</p>
+            <div class="drift-card drift-card--sig">
+                <div class="drift-card__icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 9 12l-5-5M12 19h8"/></svg>
+                </div>
+                <div>
+                    <h3>signature_changed</h3>
+                    <p>A parameter was added, removed, or renamed. The old and new signatures are stored side-by-side.</p>
+                </div>
             </div>
-            <div class="card feature-card">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
-                <h3>Token-efficient re-runs</h3>
-                <p>Hash-based change detection means re-analysis only regenerates docs for
-                    code that actually changed.</p>
+            <div class="drift-card drift-card--new">
+                <div class="drift-card__icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                </div>
+                <div>
+                    <h3>new_undocumented</h3>
+                    <p>Code that exists in the current snapshot but has no docstring and was never seen before.</p>
+                </div>
             </div>
-            <div class="card feature-card">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M21 3l-7 7M8 21H3v-5M3 21l7-7"/></svg>
-                <h3>Real diffs</h3>
-                <p>Every drift flag includes a unified diff of the source change, rendered
-                    line by line inside the dashboard.</p>
-            </div>
-            <div class="card feature-card">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>
-                <h3>Fast & parallel</h3>
-                <p>Batched pipeline with parallel doc generation and live progress —
-                    resumable, so closing a tab doesn't lose work.</p>
-            </div>
-            <div class="card feature-card">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8.5 12.5 2.5 2.5 5-6"/></svg>
-                <h3>Works everywhere</h3>
-                <p>A clean responsive interface with light and dark themes — check drift
-                    from your phone as easily as your desktop.</p>
+            <div class="drift-card drift-card--orphan">
+                <div class="drift-card__icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                </div>
+                <div>
+                    <h3>orphaned_doc</h3>
+                    <p>A function or class that was documented in the previous snapshot but no longer exists.</p>
+                </div>
             </div>
         </div>
     </section>
 
+    {# ── CTA ──────────────────────────────────────────────────────── #}
     <section class="landing-cta">
         <h2>Stop trusting stale docs.</h2>
         <p>Create an account and analyze your first repository in under a minute.</p>
-        <a href="{% url 'register' %}" class="btn btn--primary">Get started — it's free</a>
+        <a href="{% url 'register' %}" class="btn btn--primary btn--lg">
+            Get started — it's free
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
     </section>
 
 </div>
