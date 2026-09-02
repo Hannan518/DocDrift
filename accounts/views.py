@@ -13,7 +13,24 @@ def landing(request):
     """Marketing landing page for logged-out visitors."""
     if request.user.is_authenticated:
         return redirect('repositories:list')
-    return render(request, 'landing.html')
+    # Pull live aggregate stats from the demo workspace so the CTA
+    # section shows real numbers instead of marketing filler.
+    from django.db.models import Count, Q
+    from analysis.models import Snapshot, CodeEntity, DriftFlag
+    entities_documented = (
+        CodeEntity.objects
+        .filter(generated_docstring__isnull=False)
+        .count()
+    )
+    repositories = Snapshot.objects.values('repository').distinct().count()
+    drift_flags = DriftFlag.objects.count()
+    return render(request, 'landing.html', {
+        'aggregate': {
+            'entities_documented': entities_documented,
+            'repositories': repositories,
+            'drift_flags': drift_flags,
+        },
+    })
 
 
 def register_user(request):

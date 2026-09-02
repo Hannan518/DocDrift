@@ -93,6 +93,9 @@
     <!-- CSRF token available to any page-level JS -->
     <div hidden>{% csrf_token %}</div>
 
+    <!-- 3D background canvas, mounted only on the landing page -->
+    {% block bg_canvas %}{% endblock %}
+
     <main>
         {% block content %}{% endblock %}
     </main>

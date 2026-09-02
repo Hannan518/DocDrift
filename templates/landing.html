@@ -2,7 +2,9 @@
 {% load static %}
 
 {% block title %}DocDrift — Documentation that keeps up with your code{% endblock %}
-{% block body_class %}has-snap{% endblock %}
+{% block body_class %}has-snap has-bg3d{% endblock %}
+
+{% block bg_canvas %}<canvas id="bg-3d" aria-hidden="true"></canvas>{% endblock %}
 
 {% block content %}
 <div class="snap" id="snap">
@@ -76,8 +78,10 @@
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
                     </div>
                     <span class="step-card__idx">01</span>
-                    <h3>Connect a repository</h3>
-                    <p>Paste a public GitHub URL. DocDrift shallow-clones it and maps every module, class, and public function with Python's <code>ast</code> module — signatures, source hashes, and class-method links included.</p>
+                    <div class="step-card__body">
+                        <h3>Connect a repository</h3>
+                        <p>Paste a public GitHub URL. DocDrift shallow-clones it and maps every module, class, and public function with Python's <code>ast</code> module — signatures, source hashes, and class-method links included.</p>
+                    </div>
                 </div>
                 <div class="card step-card" data-reveal style="--i:1">
                     <div class="step-card__node"></div>
@@ -85,8 +89,10 @@
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 9 9l-7 1 5 5-1 7 6-3 6 3-1-7 5-5-7-1z"/></svg>
                     </div>
                     <span class="step-card__idx">02</span>
-                    <h3>Generate documentation</h3>
-                    <p>An LLM writes a Google-style docstring for every undocumented entity. Unchanged code keeps its docs on re-runs — hash-based change detection means you only pay tokens for what changed.</p>
+                    <div class="step-card__body">
+                        <h3>Generate documentation</h3>
+                        <p>An LLM writes a Google-style docstring for every undocumented entity. Unchanged code keeps its docs on re-runs — hash-based change detection means you only pay tokens for what changed.</p>
+                    </div>
                 </div>
                 <div class="card step-card" data-reveal style="--i:2">
                     <div class="step-card__node"></div>
@@ -94,8 +100,10 @@
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                     </div>
                     <span class="step-card__idx">03</span>
-                    <h3>Detect drift</h3>
-                    <p>Re-analyze anytime. DocDrift compares snapshots and flags stale docs, signature changes, new undocumented code, and orphaned docs — each with a real unified diff attached.</p>
+                    <div class="step-card__body">
+                        <h3>Detect drift</h3>
+                        <p>Re-analyze anytime. DocDrift compares snapshots and flags stale docs, signature changes, new undocumented code, and orphaned docs — each with a real unified diff attached.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -208,17 +216,51 @@
     </section>
 
     {# ── 5 · CTA ──────────────────────────────────────────────────── #}
-    <section class="snap-section landing-cta" id="s-cta">
+    <section class="snap-section landing-cta is-flex" id="s-cta">
         <div class="container snap-section__inner">
-            <div class="landing-cta__content" data-reveal>
-                <h2>Stop trusting stale docs.</h2>
-                <p>Create an account and analyze your first repository in under a minute.</p>
-                <a href="{% url 'register' %}" class="btn btn--primary btn--lg">
-                    Get started — it's free
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                </a>
+            <div class="cta-grid">
+                <div class="cta-grid__primary" data-reveal>
+                    <span class="section-head__eyebrow">Get started</span>
+                    <h2>Stop trusting stale docs.</h2>
+                    <p>Create an account and analyze your first repository in under a minute. The full pipeline runs in your browser — no setup, no API keys on your side.</p>
+                    <a href="{% url 'register' %}" class="btn btn--primary btn--lg cta-btn">
+                        Get started — it's free
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </a>
+                    <p class="cta-fineprint">No credit card. Public GitHub repos only. Free-tier Gemini key on the server.</p>
+                </div>
+
+                <div class="cta-grid__side">
+                    <div class="cta-proof" data-reveal style="--i:1">
+                        <div class="cta-proof__icon">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 17 4-4 4 4 6-6"/></svg>
+                        </div>
+                        <div>
+                            <div class="cta-proof__value mono">{{ aggregate.entities_documented|default:0 }}</div>
+                            <div class="cta-proof__label">entities documented across the demo workspace</div>
+                        </div>
+                    </div>
+                    <div class="cta-proof" data-reveal style="--i:2">
+                        <div class="cta-proof__icon">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        </div>
+                        <div>
+                            <div class="cta-proof__value mono">{{ aggregate.repositories|default:0 }}</div>
+                            <div class="cta-proof__label">repositories analyzed so far</div>
+                        </div>
+                    </div>
+                    <div class="cta-proof" data-reveal style="--i:3">
+                        <div class="cta-proof__icon">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M21 3l-7 7M8 21H3v-5M3 21l7-7"/></svg>
+                        </div>
+                        <div>
+                            <div class="cta-proof__value mono">{{ aggregate.drift_flags|default:0 }}</div>
+                            <div class="cta-proof__label">drift flags raised and resolved</div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="landing-cta__band" data-reveal style="--i:1">
+            <div class="landing-cta__band" data-reveal style="--i:4">
                 <div class="band-item">
                     <span class="band-item__value mono">ast.parse</span>
                     <span class="band-item__label">not regex</span>
@@ -253,4 +295,12 @@
 
 {% block extra_js %}
 <script src="{% static 'js/pages/landing.js' %}" defer></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module" src="{% static 'js/bg3d.js' %}"></script>
 {% endblock %}
