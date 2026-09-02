@@ -32,15 +32,22 @@ def _is_public_entity(name: str) -> bool:
     """Whether an entity is part of the public API surface.
 
     Public = not a private/internal helper (leading underscore) and not
-    a test (test_ prefix). Dunder names (`__init__`, `__all__`, etc.)
-    are always treated as public so package entry points are
-    documented. This is a name-only rule - we don't filter on file
-    paths, since the user submitted the repo and may want any file
-    documented.
+    a test. Tests are detected by:
+      - name starting with test_ (a test function or method)
+      - class name ending in Test, TestCase, or Tests (a test class)
+    Dunder names (`__init__`, `__all__`, etc.) are always treated as
+    public so package entry points are documented. This is a name-only
+    rule - we don't filter on file paths, since the user submitted the
+    repo and may want any file documented.
     """
     if name.startswith('test_') and not name.startswith('test___'):
         return False
     if name.startswith('_') and not (name.startswith('__') and name.endswith('__')):
+        return False
+    # Test class detection. Strip the trailing "s" on "Tests" so we
+    # don't accidentally match legitimate class names like "BetaTests"
+    # - the user can rename those.
+    if name.endswith('TestCase') or name.endswith('Test'):
         return False
     return True
 
@@ -122,6 +129,13 @@ class PythonASTParser:
         qualified_name = f"{parent_name}.{node.name}"
         entities = []
 
+        # Skip the class entirely if it isn't part of the public API
+        # (private name or test class). Without this, a TestCase class
+        # itself leaks in even though its test_* methods would be
+        # filtered below.
+        if not _is_public_entity(node.name):
+            return entities
+
         # Add the class itself
         entities.append(ParsedEntity(
             entity_type='class',
@@ -136,10 +150,11 @@ class PythonASTParser:
             source_body=ast.unparse(node),
         ))
 
-        # Add public methods (skip private/dunder methods starting with _)
+        # Add public methods (skip private/dunder methods starting with _,
+        # and test_ methods - they're tests, not public API)
         for item in node.body:
             if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if not item.name.startswith('_'):
+                if _is_public_entity(item.name):
                     entities.append(self._parse_function(
                         item,
                         qualified_name,

@@ -286,3 +286,25 @@ class TestPublicApiFilter:
         # simple.py defines SimpleClass, ClassWithInit, simple_function, etc.
         assert 'SimpleClass' in names
         assert 'ClassWithInit' in names
+
+    def test_test_class_itself_is_skipped(self, parser, tmp_path):
+        """A class whose only purpose is to group test_* methods
+        should be skipped entirely, not just its methods - otherwise
+        the class leaks through as 'public API'."""
+        f = tmp_path / 'tests' / 'mod.py'
+        f.parent.mkdir()
+        f.write_text(
+            'class RealAPI:\n'
+            '    def do_thing(self):\n'
+            '        return 1\n'
+            '\n'
+            'class ScriptTestCase:\n'
+            '    def test_something(self):\n'
+            '        assert True\n'
+        )
+        entities = parser.parse_file(f, root_path=tmp_path)
+        names = [e.name for e in entities]
+        assert 'RealAPI' in names
+        assert 'ScriptTestCase' not in names
+        # And no test method should leak
+        assert 'test_something' not in names
