@@ -64,7 +64,15 @@
                         {% if flag.detail.new_doc %}
                             <div class="flag__doc">{{ flag.detail.new_doc }}</div>
                         {% endif %}
-                        <div>
+                        <div class="flag__actions">
+                            {% if flag.current_entity_id %}
+                                <button type="button" class="btn btn--primary btn--sm"
+                                        data-action="regenerate-entity"
+                                        data-entity-id="{{ flag.current_entity_id }}">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
+                                    Regenerate doc
+                                </button>
+                            {% endif %}
                             <button type="button" class="btn btn--secondary btn--sm" data-action="toggle-diff">View diff</button>
                         </div>
                         <div class="diff-box hidden" data-diff></div>

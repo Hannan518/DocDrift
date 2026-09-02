@@ -56,6 +56,7 @@ class CodeEntity(models.Model):
         ('generated', 'LLM Generated'),
         ('copied', 'Copied from Previous Snapshot'),
         ('existing', 'Existing in Source Code'),
+        ('stale', 'Stale - Code Changed, Awaiting Review'),
         ('none', 'No Documentation'),
     ]
     

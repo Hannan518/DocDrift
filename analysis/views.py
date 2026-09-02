@@ -7,6 +7,7 @@ from django.conf import settings
 from django.db.models import Q
 import json
 import logging
+import time
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
@@ -14,7 +15,12 @@ from capstone.utils import parse_json_body
 from .models import Snapshot, CodeEntity
 from .parser import PythonASTParser
 from .drift_detector import DriftDetector
-from .constants import PARSING_BATCH_SIZE, DOC_GEN_BATCH_SIZE
+from .constants import (
+    PARSING_BATCH_SIZE,
+    DOC_GEN_BATCH_SIZE,
+    DOC_GEN_MAX_WORKERS,
+    DOC_GEN_WORKER_STAGGER_S,
+)
 from repositories.ingestion import list_python_files, cleanup_temp_directory
 from llm.gemini import GeminiDocGenerator
 from llm.base import LLMConfigError
@@ -26,7 +32,13 @@ MAX_BATCH_LIMIT = 50
 
 
 def _entities_needing_docs(snapshot):
-    """Entities with no documentation at all (the LLM work-set)."""
+    """Entities with no documentation at all (the LLM work-set).
+
+    Under the review-gate policy (option A), a changed entity whose
+    previous generated doc existed is NOT in this set - the drift
+    dashboard owns that signal, and the user can regenerate per-entity
+    via the regenerate endpoint.
+    """
     return snapshot.entities.filter(
         generated_docstring__isnull=True,
         existing_docstring__isnull=True
@@ -148,7 +160,16 @@ def parse_batch(request, snapshot_id):
 @login_required
 @require_http_methods(["POST"])
 def prepare_docs(request, snapshot_id):
-    """Copy forward unchanged generated docs from the previous snapshot."""
+    """
+    Prepare doc state for the current snapshot under the review-gate policy.
+
+    - Unchanged code with a prior generated doc: copy forward (doc_source='copied').
+    - Changed code with a prior generated doc: keep the old doc but mark it
+      stale (doc_source='stale'). The LLM work-set excludes these so the doc
+      is NOT silently regenerated. The drift dashboard owns the signal, and
+      the user can regenerate per-entity via the regenerate endpoint.
+    - New entities or entities with no prior doc: left in the LLM work-set.
+    """
     snapshot = get_object_or_404(
         Snapshot,
         id=snapshot_id,
@@ -161,6 +182,7 @@ def prepare_docs(request, snapshot_id):
     ).order_by('-timestamp').first()
 
     copied_count = 0
+    stale_count = 0
     if previous:
         prev_entities = {
             e.qualified_name: e
@@ -170,16 +192,25 @@ def prepare_docs(request, snapshot_id):
         to_update = []
         for curr_entity in snapshot.entities.all():
             prev_entity = prev_entities.get(curr_entity.qualified_name)
+            if not prev_entity or not prev_entity.generated_docstring:
+                continue
 
-            if prev_entity and curr_entity.source_hash == prev_entity.source_hash \
-                    and prev_entity.generated_docstring:
-                # Code unchanged and the previous snapshot had a generated
-                # doc - carry it forward without spending tokens.
+            if curr_entity.source_hash == prev_entity.source_hash:
+                # Unchanged: copy the doc forward, no LLM call.
                 curr_entity.generated_docstring = prev_entity.generated_docstring
                 curr_entity.doc_source = 'copied'
                 curr_entity.doc_last_generated = prev_entity.doc_last_generated
                 to_update.append(curr_entity)
                 copied_count += 1
+            else:
+                # Changed: keep the prior doc so the user can review what
+                # changed, but mark it stale so the drift dashboard flags it
+                # and the LLM work-set skips it.
+                curr_entity.generated_docstring = prev_entity.generated_docstring
+                curr_entity.doc_source = 'stale'
+                curr_entity.doc_last_generated = prev_entity.doc_last_generated
+                to_update.append(curr_entity)
+                stale_count += 1
 
         if to_update:
             CodeEntity.objects.bulk_update(
@@ -196,6 +227,7 @@ def prepare_docs(request, snapshot_id):
     return JsonResponse({
         'entities_to_document': entities_needing_docs,
         'entities_copied': copied_count,
+        'entities_marked_stale': stale_count,
         'status': snapshot.status
     })
 
@@ -256,8 +288,13 @@ def generate_docs_batch(request, snapshot_id):
 
         llm_client = GeminiDocGenerator(api_key=settings.GEMINI_API_KEY)
 
-        def generate_one(entity):
+        def generate_one(entity, index):
             """Worker: LLM call only - no database access from threads."""
+            # Stagger worker startup so the burst is spread over ~1.25s
+            # for a 5-entity batch. Keeps a free-tier 15 req/min quota
+            # from 429ing the whole batch in lockstep.
+            if DOC_GEN_WORKER_STAGGER_S > 0 and index > 0:
+                time.sleep(index * DOC_GEN_WORKER_STAGGER_S)
             try:
                 docstring = llm_client.generate_docstring(
                     entity_type=entity.entity_type,
@@ -274,8 +311,11 @@ def generate_docs_batch(request, snapshot_id):
                 return (entity, None, e)
 
         results = []
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(generate_one, e) for e in entities]
+        with ThreadPoolExecutor(max_workers=DOC_GEN_MAX_WORKERS) as executor:
+            futures = [
+                executor.submit(generate_one, e, i)
+                for i, e in enumerate(entities)
+            ]
             for future in futures:
                 results.append(future.result())
 
@@ -331,6 +371,70 @@ def generate_docs_batch(request, snapshot_id):
     except Exception as e:
         logger.error("Generate docs batch failed: %s", e)
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def regenerate_entity(request, snapshot_id, entity_id):
+    """
+    Regenerate a single entity's docstring via the LLM.
+
+    The review-gate path: when an entity is flagged stale_doc, the user
+    can ask the model to refresh just that one doc without re-running
+    the entire analysis. The new doc replaces the stale one, and the
+    stale flag for that entity is removed (since it's no longer stale -
+    either the doc is fresh, or the user can decide the new doc matches
+    the new code).
+    """
+    from django.utils import timezone as tz
+    from llm.gemini import GeminiDocGenerator
+    from llm.base import LLMConfigError
+
+    entity = get_object_or_404(
+        CodeEntity,
+        id=entity_id,
+        snapshot_id=snapshot_id,
+        snapshot__repository__owner=request.user,
+    )
+
+    try:
+        llm_client = GeminiDocGenerator(api_key=settings.GEMINI_API_KEY)
+        new_doc = llm_client.generate_docstring(
+            entity_type=entity.entity_type,
+            name=entity.name,
+            signature=entity.signature,
+            body=entity.source_body or '',
+        )
+    except LLMConfigError as e:
+        return JsonResponse({'error': str(e)}, status=502)
+    except Exception as e:
+        logger.error("Per-entity regen failed for %s: %s", entity.qualified_name, e)
+        return JsonResponse({'error': str(e)}, status=500)
+
+    entity.generated_docstring = new_doc
+    entity.doc_source = 'generated'
+    entity.doc_last_generated = tz.now()
+    entity.save(update_fields=['generated_docstring', 'doc_source', 'doc_last_generated'])
+
+    # The user has explicitly refreshed the doc, so any stale_doc flag
+    # for this entity is no longer a real warning.
+    from .models import DriftFlag
+    DriftFlag.objects.filter(
+        current_entity=entity,
+        flag_type='stale_doc',
+    ).delete()
+
+    # Refresh documented count on the snapshot.
+    snapshot = entity.snapshot
+    snapshot.entities_documented = _documented_count(snapshot)
+    snapshot.save(update_fields=['entities_documented'])
+
+    return JsonResponse({
+        'id': entity.id,
+        'doc': new_doc,
+        'doc_source': entity.doc_source,
+        'doc_last_generated': entity.doc_last_generated.isoformat(),
+    })
 
 
 @login_required

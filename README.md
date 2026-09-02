@@ -222,14 +222,16 @@ SQLite serializes writes. The doc-gen workers only call the LLM and return their
 
 1. **Python-only** — AST is language-specific; other languages would need a different parser.
 2. **Public repos only** — No GitHub OAuth for private repos.
-3. **No nested-class extraction** — Top-level classes and their public methods are parsed; classes inside classes are not recursed into.
-4. **No webhook triggers** — Analysis is started from the UI.
-5. **Best-effort static analysis** — Dynamic / metaprogrammed code is not resolved.
+3. **Documents public API surface only** — The parser excludes entities that are not part of the public API: anything whose name starts with an underscore (private/internal helpers) and any function whose name starts with `test_` (tests). Dunder names like `__init__` are kept (they're part of the public API). This is a permanent design decision, not a temporary optimization - the doc generator is meant to produce user-facing documentation, so burning tokens on private helpers and test functions is wasteful. The skip is name-based, not path-based, so test directories in the *analyzed* repo are still traversed (and any public entities inside them are documented).
+4. **No nested-class extraction** — Top-level classes and their public methods are parsed; classes inside classes are not recursed into.
+5. **No webhook triggers** — Analysis is started from the UI.
+6. **Best-effort static analysis** — Dynamic / metaprogrammed code is not resolved.
 
 ## Known Limitations
 
-- **Repo size**: Configured for repos with <100 Python files (raises a clear validation error otherwise).
+- **Repo size**: Configured for repos with <100 Python files (raises a clear validation error otherwise). This is a hard cap, not a tuning knob — a "real" production codebase (Django, httpx, pandas, etc.) has hundreds to thousands of files, all of which would be excluded. The cap exists because the doc-gen phase scales with the number of undocumented public entities, and free-tier Gemini quotas can't absorb a 1000+ entity run in reasonable time. Suitable for a course project and small libraries; not suitable as-is for production codebases.
 - **Re-submitting the same repo** triggers a fresh snapshot and a new analysis run.
+- **Deployment to Render is described but not yet live-tested** — the synchronous micro-batch architecture is built around an assumed request-timeout of 15-30s, but the actual Render timeout for the chosen plan and any real-world load behavior (cold starts, worker pool sizing) have not been verified end-to-end. The `gunicorn capstone.wsgi` start command and `DATABASE_URL`-based config will work in principle, but the production timeout story is a design intention, not a confirmed fact.
 
 ## Future Enhancements (Out of Scope)
 

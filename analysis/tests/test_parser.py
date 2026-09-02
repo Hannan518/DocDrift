@@ -218,3 +218,66 @@ class TestParserQualifiedNames:
         assert cls.qualified_name == 'pkg.mod.A'
         assert mth.qualified_name == 'pkg.mod.A.b'
         assert mth.parent_qualified_name == 'pkg.mod.A'
+
+
+class TestPublicApiFilter:
+    """The parser documents public API only - private (leading _) and
+    test (test_ prefix) entities are excluded."""
+
+    def test_private_top_level_function_skipped(self, parser, tmp_path):
+        f = tmp_path / 'mod.py'
+        f.write_text('def public_one():\n    pass\ndef _private_one():\n    pass\n')
+        entities = parser.parse_file(f, root_path=tmp_path)
+        names = [e.name for e in entities]
+        assert 'public_one' in names
+        assert '_private_one' not in names
+
+    def test_private_class_skipped(self, parser, tmp_path):
+        f = tmp_path / 'mod.py'
+        f.write_text('class Public:\n    pass\nclass _Private:\n    pass\n')
+        entities = parser.parse_file(f, root_path=tmp_path)
+        names = [e.name for e in entities]
+        assert 'Public' in names
+        assert '_Private' not in names
+
+    def test_test_function_skipped(self, parser, tmp_path):
+        f = tmp_path / 'mod.py'
+        f.write_text('def public_func():\n    pass\ndef test_something():\n    assert True\n')
+        entities = parser.parse_file(f, root_path=tmp_path)
+        names = [e.name for e in entities]
+        assert 'public_func' in names
+        assert 'test_something' not in names
+
+    def test_dunder_names_kept(self, parser, tmp_path):
+        """Dunder names (e.g. __init__) are public, even though they
+        start with an underscore - they're part of the public API."""
+        f = tmp_path / 'mod.py'
+        f.write_text('def __init__():\n    pass\ndef _private():\n    pass\n')
+        entities = parser.parse_file(f, root_path=tmp_path)
+        names = [e.name for e in entities]
+        assert '__init__' in names
+        assert '_private' not in names
+
+    def test_private_method_in_public_class_still_skipped(self, parser, tmp_path):
+        f = tmp_path / 'mod.py'
+        f.write_text(
+            'class Public:\n'
+            '    def public_method(self):\n'
+            '        return 1\n'
+            '    def _private_method(self):\n'
+            '        return 2\n'
+        )
+        entities = parser.parse_file(f, root_path=tmp_path)
+        method_names = [e.name for e in entities if e.entity_type == 'function']
+        assert 'public_method' in method_names
+        assert '_private_method' not in method_names
+
+    def test_fixture_path_does_not_trigger_filter(self, parser):
+        """Files in our own tests/fixtures/ directory must NOT be
+        treated as 'test' code just because of the path - the filter
+        is name-only, so the fixture parser tests still work."""
+        entities = parser.parse_file(FIXTURES_DIR / 'simple.py')
+        names = [e.name for e in entities]
+        # simple.py defines SimpleClass, ClassWithInit, simple_function, etc.
+        assert 'SimpleClass' in names
+        assert 'ClassWithInit' in names

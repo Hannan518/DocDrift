@@ -20,7 +20,14 @@
     signature: document.getElementById('entity-signature'),
     doc: document.getElementById('entity-doc'),
     body: document.getElementById('entity-body'),
+    regenBtn: document.getElementById('entity-regen-btn'),
   };
+
+  // Snapshot id (for per-entity regenerate URL).
+  const snapshotId = (() => {
+    const m = window.location.pathname.match(/\/analysis\/(\d+)\/browser\//);
+    return m ? m[1] : null;
+  })();
 
   const KIND_ICONS = {
     class: '<svg class="kind-class" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 17V9h6M9 13h5"/></svg>',
@@ -32,8 +39,11 @@
     generated: ['doc-badge--generated', 'LLM generated'],
     copied: ['doc-badge--copied', 'Carried from previous run'],
     existing: ['doc-badge--existing', 'From source code'],
+    stale: ['doc-badge--stale', 'Stale - code changed, awaiting review'],
     none: ['doc-badge--none', 'Undocumented'],
   };
+
+  let currentEntityId = null;
 
   // ---- Build tree: file -> top-level entities -> children ----
   const roots = entities.filter((e) => !e.parent_id);
@@ -159,6 +169,7 @@
   function selectEntity(id) {
     const entity = byId.get(id);
     if (!entity) return;
+    currentEntityId = id;
 
     document.querySelectorAll('.tree-node').forEach((n) => n.classList.remove('is-selected'));
     document.querySelector(`[data-entity-id="${id}"]`)?.classList.add('is-selected');
@@ -173,8 +184,50 @@
     els.badge.className = `doc-badge ${badgeClass}`;
     els.badge.textContent = entity.doc ? badgeText : 'Undocumented';
 
+    // Show the regenerate button only when the doc is stale (user can
+    // explicitly ask the LLM to refresh just this one).
+    if (entity.doc_source === 'stale') {
+      els.regenBtn.classList.remove('hidden');
+      els.regenBtn.disabled = false;
+      els.regenBtn.textContent = 'Regenerate doc';
+    } else {
+      els.regenBtn.classList.add('hidden');
+    }
+
     els.signature.textContent = entity.signature;
     els.doc.textContent = entity.doc || 'No documentation available for this entity.';
     els.body.textContent = entity.body;
   }
+
+  // Per-entity regenerate: POST to the analysis endpoint, swap the doc text
+  // and badge in place. No reload needed.
+  els.regenBtn?.addEventListener('click', async () => {
+    if (!currentEntityId || !snapshotId) return;
+    const url = `/analysis/${snapshotId}/entities/${currentEntityId}/regenerate/`;
+    els.regenBtn.disabled = true;
+    els.regenBtn.textContent = 'Regenerating…';
+    try {
+      const res = await window.DocDrift.api(url, { method: 'POST', body: {} });
+      if (res.status >= 200 && res.status < 300) {
+        const data = res.data;
+        // Update local cache + DOM
+        const e = byId.get(currentEntityId);
+        if (e) { e.doc = data.doc; e.doc_source = data.doc_source; }
+        els.doc.textContent = data.doc;
+        const [badgeClass, badgeText] = BADGES[data.doc_source] || BADGES.generated;
+        els.badge.className = `doc-badge ${badgeClass}`;
+        els.badge.textContent = badgeText;
+        window.DocDrift.toast('Documentation regenerated', 'success');
+        els.regenBtn.classList.add('hidden');
+      } else {
+        const msg = (res.data && res.data.error) || 'Regenerate failed';
+        window.DocDrift.toast(msg, 'error');
+      }
+    } catch (e) {
+      window.DocDrift.toast('Regenerate failed', 'error');
+    } finally {
+      els.regenBtn.disabled = false;
+      els.regenBtn.textContent = 'Regenerate doc';
+    }
+  });
 })();

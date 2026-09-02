@@ -32,10 +32,15 @@ class GeminiDocGenerator(BaseLLMProvider):
     exponential backoff.
     """
 
+    # Models tried in order. The first must work for new users on a fresh
+    # API key; subsequent entries are fallbacks. Update the list when
+    # Google deprecates a model - the SDK returns 404 rather than
+    # redirecting to a replacement.
     MODELS = [
-        'gemini-flash-latest',
-        'gemini-2.5-flash',
+        'gemini-3.6-flash',
         'gemini-3.5-flash',
+        'gemini-2.5-flash',
+        'gemini-flash-latest',
     ]
 
     def __init__(self, api_key: str):

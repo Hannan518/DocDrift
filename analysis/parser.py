@@ -28,6 +28,23 @@ def _is_string_expr(node) -> bool:
         and isinstance(node.value.value, str)
 
 
+def _is_public_entity(name: str) -> bool:
+    """Whether an entity is part of the public API surface.
+
+    Public = not a private/internal helper (leading underscore) and not
+    a test (test_ prefix). Dunder names (`__init__`, `__all__`, etc.)
+    are always treated as public so package entry points are
+    documented. This is a name-only rule - we don't filter on file
+    paths, since the user submitted the repo and may want any file
+    documented.
+    """
+    if name.startswith('test_') and not name.startswith('test___'):
+        return False
+    if name.startswith('_') and not (name.startswith('__') and name.endswith('__')):
+        return False
+    return True
+
+
 class PythonASTParser:
     """AST-based Python code parser."""
 
@@ -63,9 +80,11 @@ class PythonASTParser:
 
         for node in ast.iter_child_nodes(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                entities.append(self._parse_function(node, module_name, file_path, None))
+                if _is_public_entity(node.name):
+                    entities.append(self._parse_function(node, module_name, file_path, None))
             elif isinstance(node, ast.ClassDef):
-                entities.extend(self._parse_class(node, module_name, file_path, None))
+                if _is_public_entity(node.name):
+                    entities.extend(self._parse_class(node, module_name, file_path, None))
 
         return entities
 

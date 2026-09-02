@@ -50,7 +50,14 @@
                                 <h2 id="entity-name" style="font-family: var(--font-mono);"></h2>
                                 <p class="muted small" id="entity-location"></p>
                             </div>
-                            <span class="doc-badge" id="entity-doc-badge"></span>
+                            <div class="card-title-actions">
+                                <span class="doc-badge" id="entity-doc-badge"></span>
+                                <button type="button" class="btn btn--secondary btn--sm hidden" id="entity-regen-btn"
+                                        data-action="regenerate-entity">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
+                                    Regenerate doc
+                                </button>
+                            </div>
                         </div>
                         <div class="code-pane"><pre><code id="entity-signature"></code></pre></div>
                     </div>
