@@ -80,7 +80,7 @@
                     <span class="step-card__idx">01</span>
                     <div class="step-card__body">
                         <h3>Connect a repository</h3>
-                        <p>Paste a public GitHub URL. DocDrift shallow-clones it and maps every module, class, and public function with Python's <code>ast</code> module — signatures, source hashes, and class-method links included.</p>
+                        <p>Paste a public GitHub URL. DocDrift shallow-clones the repo and maps every module, class, and public function with Python's <code>ast</code>.</p>
                     </div>
                 </div>
                 <div class="card step-card" data-reveal style="--i:1">
@@ -91,7 +91,7 @@
                     <span class="step-card__idx">02</span>
                     <div class="step-card__body">
                         <h3>Generate documentation</h3>
-                        <p>An LLM writes a Google-style docstring for every undocumented entity. Unchanged code keeps its docs on re-runs — hash-based change detection means you only pay tokens for what changed.</p>
+                        <p>An LLM writes a Google-style docstring for every undocumented entity. Re-runs only touch code whose hash changed, so you only pay for what changed.</p>
                     </div>
                 </div>
                 <div class="card step-card" data-reveal style="--i:2">
@@ -102,7 +102,7 @@
                     <span class="step-card__idx">03</span>
                     <div class="step-card__body">
                         <h3>Detect drift</h3>
-                        <p>Re-analyze anytime. DocDrift compares snapshots and flags stale docs, signature changes, new undocumented code, and orphaned docs — each with a real unified diff attached.</p>
+                        <p>Re-analyze anytime. DocDrift compares snapshots and flags stale docs, signature changes, and orphaned code — each with a real unified diff attached.</p>
                     </div>
                 </div>
             </div>

@@ -903,8 +903,10 @@ main {
 
 /* ---- Landing: full-viewport snap sections ---- */
 body.has-snap { overflow: hidden; height: 100svh; }
-body.has-snap main { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+html:has(body.has-snap) { overflow: hidden; }  /* belt-and-suspenders: clip at the html level too */
+body.has-snap main { padding: 0; display: flex; flex-direction: column; overflow: hidden; overflow-x: clip; }
 body.has-snap .footer { display: none; }
+.snap-section { overflow: hidden; overflow-x: clip; }  /* clip any rogue child that would push the section wider */
 
 /* 3D background canvas: behind the snap content, full viewport */
 #bg-3d {
@@ -924,6 +926,7 @@ body.has-snap .snap-rail { z-index: 42; }
 .snap {
   scroll-snap-type: y proximity;
   overflow-y: auto;
+  overflow-x: clip;
   flex: 1;
   height: 100%;
   /* Smooth scroll uses the browser's native easing; snap proximity
