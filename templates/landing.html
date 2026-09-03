@@ -2,9 +2,7 @@
 {% load static %}
 
 {% block title %}DocDrift — Documentation that keeps up with your code{% endblock %}
-{% block body_class %}has-snap has-bg3d{% endblock %}
-
-{% block bg_canvas %}<canvas id="bg-3d" aria-hidden="true"></canvas>{% endblock %}
+{% block body_class %}has-snap{% endblock %}
 
 {% block content %}
 <div class="snap" id="snap">
@@ -295,12 +293,4 @@
 
 {% block extra_js %}
 <script src="{% static 'js/pages/landing.js' %}" defer></script>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-  }
-}
-</script>
-<script type="module" src="{% static 'js/bg3d.js' %}"></script>
 {% endblock %}

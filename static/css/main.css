@@ -902,31 +902,11 @@ main {
 .auth-alt { text-align: center; margin-top: 18px; font-size: 0.88rem; color: var(--text-muted); }
 
 /* ---- Landing: full-viewport snap sections ---- */
-body.has-snap { overflow: hidden; height: 100svh; background: transparent; }
-html:has(body.has-snap) { overflow: hidden; background: var(--bg); }
+body.has-snap { overflow: hidden; height: 100svh; }
+html:has(body.has-snap) { overflow: hidden; }
 body.has-snap main { padding: 0; display: flex; flex-direction: column; overflow: hidden; overflow-x: clip; }
 body.has-snap .footer { display: none; }
 .snap-section { overflow: hidden; overflow-x: clip; }  /* clip any rogue child that would push the section wider */
-
-/* 3D background canvas: ABOVE the snap container so the field
-   is actually visible in the negative space of each section (the
-   snap sections have align-content: center so there's empty space
-   top and bottom). Sections with their own backgrounds (the demo
-   card, step cards, etc) still cover the canvas in their own
-   bounds, so the network peeks through around the content. */
-#bg-3d {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.6;
-  transition: opacity 600ms ease;
-}
-body.has-snap main { position: relative; z-index: 0; }
-body.has-snap .nav { z-index: 41; } /* sit above the canvas */
-body.has-snap .snap-rail { z-index: 42; }
-@media (max-width: 1023px) { #bg-3d { display: none; } }
-@media (prefers-reduced-motion: reduce) { #bg-3d { display: none; } }
 
 .snap {
   scroll-snap-type: y proximity;
